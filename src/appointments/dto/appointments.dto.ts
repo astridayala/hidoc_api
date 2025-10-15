@@ -17,10 +17,8 @@ export class CreateAppointmentsDto {
         description: 'Fecha y hora de inicio (YYYY-MM-DD HH:mm, 24h)',
     })
     @IsNotEmpty({ message: 'La fecha y hora de inicio son obligatorias' })
-    // 1. Eliminar @Matches. La validación del formato la hará la transformación.
-    // 2. Ejecutar la transformación antes de la validación final.
     @Type(() => Date)
-    @IsDate({ message: 'La fecha y hora de inicio deben ser una fecha válida' }) // <-- Usar IsDate en el tipo Date
+    @IsDate({ message: 'La fecha y hora de inicio deben ser una fecha válida' }) 
     start: Date;
 
     @ApiProperty({
