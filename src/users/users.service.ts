@@ -127,41 +127,40 @@ export class UsersService {
    * Obtiene el patient actual vinculado al usuario.
    * Heurística: buscar patient por email = user.email.
    */
-  private async findPatientForUserOrNull(user: any) {
-    const patient = await this.ds.query(
-      `SELECT *
-         FROM "patient"
-        WHERE email = $1
-        LIMIT 1`,
-      [user.email],
-    );
-    return patient[0] || null;
-  }
+  // Busca por userId si existe la columna, si no cae a email
+private async findPatientForUserOrNull(user: any) {
+  // 1) por userId (si ya migraste AddUserIdToPatient)
+  const byUser = await this.ds.query(
+    `SELECT * FROM "patient" WHERE "userId" = $1 LIMIT 1`,
+    [user.id],
+  );
+  if (byUser[0]) return byUser[0];
 
-  private async ensureMedicalRecordId(patient: any) {
-    // La columna en DB es "medicalRecordId" (camelCase con comillas).
-    const hasMR =
-      patient.medicalRecordId ??
-      patient.medicalrecordid ?? // por si el driver lo trae en minúsculas
-      null;
+  // 2) fallback por email (si aún no hay vínculo)
+  const byEmail = await this.ds.query(
+    `SELECT * FROM "patient" WHERE email = $1 LIMIT 1`,
+    [user.email],
+  );
+  return byEmail[0] || null;
+}
 
-    if (!hasMR) {
-      const rec = await this.ds.query(
-        `INSERT INTO "medical_record" DEFAULT VALUES RETURNING id, "createdAt"`,
-      );
-      const recordId = rec[0].id;
+private async ensureMedicalRecordId(patient: any) {
+  // el driver de pg devuelve snake/lowercase en keys: normalizamos
+  const current = patient.medicalRecordId ?? patient.medicalrecordid;
+  if (current) return current;
 
-      await this.ds.query(
-        `UPDATE "patient" SET "medicalRecordId" = $1 WHERE id = $2`,
-        [recordId, patient.id],
-      );
+  const rec = await this.ds.query(
+    `INSERT INTO "medical_record" DEFAULT VALUES RETURNING id`,
+  );
+  const recordId = rec[0].id;
 
-      patient.medicalRecordId = recordId;
-      return recordId;
-    }
+  await this.ds.query(
+    `UPDATE "patient" SET "medicalRecordId" = $1 WHERE id = $2`,
+    [recordId, patient.id],
+  );
+  return recordId;
+}
 
-    return hasMR;
-  }
 
   async getMyHistory(user: any) {
     const patient = await this.findPatientForUserOrNull(user);
