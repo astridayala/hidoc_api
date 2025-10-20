@@ -29,7 +29,7 @@ async function bootstrap() {
   // Configura Swagger
   const config = new DocumentBuilder()
     .setTitle('Clinica API')
-    .setDescription('API para una clinica dental')
+    .setDescription('API HiDoc- aplicación para democratizar el acceso a servicios de salud.')
     .setVersion('1.0')
     .addBearerAuth()
     .addTag('auth', 'Endpoints de autenticación')

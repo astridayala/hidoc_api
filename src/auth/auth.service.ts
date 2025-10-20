@@ -100,4 +100,11 @@ export class AuthService {
         return this.jwtService.sign(payload)
     }
 
+    async logout(userId: string) {
+        // Si usas lista negra de tokens:
+        // await this.tokenBlacklistService.add(token);
+        // O si simplemente no manejas tokens persistentes:
+        return { success: true, message: 'Token invalidado o sesión cerrada' };
+    }
+
 }
