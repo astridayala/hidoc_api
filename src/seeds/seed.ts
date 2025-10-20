@@ -13,22 +13,29 @@ async function main() {
     await dataSource.initialize();
     console.log('Conexión a la base de datos establecida');
     
-    const adminPassword = await bcrypt.hash('astri10', 10);
-    const doctorPassword = await bcrypt.hash('gus712026', 10);
+    const adminPassword = await bcrypt.hash('pato04', 10);
+    const doctorPassword = await bcrypt.hash('cabezas04', 10);
+    const pacientePassword = await bcrypt.hash('astri04', 10);
     
     console.log('Creando usuarios iniciales...');
     await dataSource.getRepository(User).save([
       {
-        name: 'Astrid Ayala',
-        email: 'astriayala06@gmail.com',
+        name: 'Valeria Castro',
+        email: 'valeria.castro@gmail.com',
         password: adminPassword,
         role: 'admin',
       },
       {
-        name: 'Gustavo Ayala',
-        email: 'gustavo.ayala2200@gmail.com',
+        name: 'Diego Cabezas',
+        email: 'diego.cabezas@gmail.com',
         password: doctorPassword,
         role: 'doctor',
+      },
+      {
+        name: 'Astrid Ayala',
+        email: 'astrid.ayala@gmail.com',
+        password: pacientePassword,
+        role: 'paciente',
       }
     ]);
     console.log('Usuarios creados');
