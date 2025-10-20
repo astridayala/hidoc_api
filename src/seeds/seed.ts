@@ -26,7 +26,6 @@ async function main() {
         name: 'Valeria Castro',
         email: 'valeria.castro@gmail.com',
         password: adminPassword,
-        // Si no usas 'admin' en tu enum, déjalo como Doctor o elimina este usuario
         role: UserRole.Doctor,
       },
       {

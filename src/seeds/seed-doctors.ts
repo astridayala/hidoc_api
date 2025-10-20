@@ -27,9 +27,9 @@ async function upsertPatient(email: string, name: string, password: string) {
     user = await userRepo.save(
       userRepo.create({ email, name, role: UserRole.Paciente, password: hash }),
     );
-    console.log(`✓ Usuario paciente creado: ${user.email}`);
+    console.log(`Usuario paciente creado: ${user.email}`);
   } else {
-    console.log(`• Usuario paciente ya existe: ${user.email}`);
+    console.log(`Usuario paciente ya existe: ${user.email}`);
   }
 
   const existingPatient = await patientRepo.findOne({ where: { email } });
@@ -44,15 +44,15 @@ async function upsertPatient(email: string, name: string, password: string) {
       address: 'Dirección de prueba',
     });
     await patientRepo.save(entity);
-    console.log(`✓ Paciente creado para: ${email}`);
+    console.log(`Paciente creado para: ${email}`);
   } else {
-    console.log(`• Paciente ya existe para: ${email}`);
+    console.log(`Paciente ya existe para: ${email}`);
   }
 }
 
 async function main() {
   await AppDataSource.initialize();
-  console.log('✅ Conectado a la base de datos');
+  console.log('Conectado a la base de datos');
 
   await upsertDoctor('maria@hidoc.com',  'Dra. María López',  '123456');
   await upsertDoctor('carlos@hidoc.com', 'Dr. Carlos Ruiz',   '123456');
@@ -61,7 +61,7 @@ async function main() {
   await upsertPatient('juan@hidoc.com', 'Juan Pérez', '123456');
 
   await AppDataSource.destroy();
-  console.log('🎉 Seed completado.');
+  console.log('Seed completado.');
 }
 
-main().catch(async (err) => { console.error('❌ Error en seed:', err); try { await AppDataSource.destroy(); } catch {} process.exit(1); });
+main().catch(async (err) => { console.error('Error en seed:', err); try { await AppDataSource.destroy(); } catch {} process.exit(1); });
