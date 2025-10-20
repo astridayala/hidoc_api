@@ -8,7 +8,7 @@ export class InitialSchemaClinica20250812123045 implements MigrationInterface {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
     // Enums
-    await queryRunner.query(`CREATE TYPE "user_role_enum" AS ENUM ('admin', 'doctor', 'paciente');`);
+    await queryRunner.query(`CREATE TYPE "user_role_enum" AS ENUM ('admin', 'doctor', 'patient');`);
     await queryRunner.query(`CREATE TYPE "patient_gender_enum" AS ENUM ('femenino', 'masculino');`);
 
     // Crear tabla de users
@@ -69,8 +69,7 @@ export class InitialSchemaClinica20250812123045 implements MigrationInterface {
         "address" TEXT,
         "medicalRecordId" uuid UNIQUE,
         "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-        CONSTRAINT "FK_patient_medicalRecord" FOREIGN KEY ("medicalRecordId") REFERENCES "medical_record" ("id") ON DELETE CASCADE
-      );
+        CONSTRAINT "FK_patient_medicalRecord" FOREIGN KEY ("medicalRecordId") REFERENCES "medical_record" ("id") ON DELETE CASCADE);
     `);
 
     // Crear tabla de relacion entre historial y padecimientos
