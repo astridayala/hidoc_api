@@ -1,37 +1,14 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsDate, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Min } from "class-validator";
+import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, Validate } from 'class-validator';
 
-/**
- * DTO para la creacion de citas
- * Define y valida los datos necesarios para crear una cita
- */
 export class CreateAppointmentsDto {
-    @ApiProperty({ example: 'b5d6c9b4-1234-5678-9101-abcdef123456', description: 'ID del paciente' })
-    @IsNotEmpty({ message: 'El paciente es obligatorio' })
-    @IsUUID('4', { message: 'El ID del paciente debe ser un UUID válido' })
-    patientId: string;
-    
-    @ApiProperty({
-        example: '2025-09-03 10:00',
-        description: 'Fecha y hora de inicio (YYYY-MM-DD HH:mm, 24h)',
-    })
-    @IsNotEmpty({ message: 'La fecha y hora de inicio son obligatorias' })
-    @Type(() => Date)
-    @IsDate({ message: 'La fecha y hora de inicio deben ser una fecha válida' }) 
-    start: Date;
+  @IsUUID() patientId: string;        // por ahora lo pasas así; luego puedes tomarlo de req.user
+  @IsUUID() doctorUserId: string;     // user.id del doctor
+  @IsDateString() start: string;      // ISO: 2025-10-21T09:00:00.000Z
+  @IsDateString() end: string;
+  @IsOptional() @IsString() reason?: string;
+  @IsOptional() @IsString() description?: string;
+}
 
-    @ApiProperty({
-        example: '2025-09-03 11:00',
-        description: 'Fecha y hora de fin (YYYY-MM-DD HH:mm, 24h)',
-    })
-    @IsNotEmpty({ message: 'La fecha y hora de fin son obligatorias' })
-    @Type(() => Date)
-    @IsDate({ message: 'La fecha y hora de fin deben ser una fecha válida' }) // <-- Usar IsDate en el tipo Date
-    end: Date;
-
-    @IsOptional()
-    @ApiProperty({ example: 'Retiro de brackets', description: 'Informacion adicional necesaria' })
-    @IsString({ message: 'La descripción debe ser una cadena de texto' })
-    description?: string
+export class CancelAppointmentDto {
+  @IsString() @IsNotEmpty() reason: string;
 }

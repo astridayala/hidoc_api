@@ -1,5 +1,7 @@
 import { DataSource } from 'typeorm';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 // Detecta si el archivo actual está compilado (dist) o es TS (src)
 const isCompiled = path.extname(__filename) === '.js';

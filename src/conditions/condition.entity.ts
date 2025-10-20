@@ -1,18 +1,18 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { MedicalRecordCondition } from "src/medical_record_conditions/medical_record_condition.entity";
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { MedicalRecordCondition } from '../medical_record_conditions/medical_record_condition.entity';
 
-/**
- * Entidad Historial Medico
- * Representa a todos los historiales de los pacientes
- */
 @Entity('condition')
 export class Condition {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column({ unique: true })
-    name: string;
+  @Column({ unique: true })
+  name: string;
 
-    @OneToMany(() => MedicalRecordCondition, mrc => mrc.condition)
-    medicalRecordConditions: MedicalRecordCondition[];
+  @OneToMany(
+    () => MedicalRecordCondition,
+    (mrc) => mrc.condition,
+    { cascade: false }
+  )
+  medicalRecordConditions: MedicalRecordCondition[];
 }

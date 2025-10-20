@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
-import { MedicalRecord } from "src/medical_record/medical_record.entity";
-import { Appointment } from "src/appointments/appointments.entity";
+import { MedicalRecord } from "../medical_record/medical_record.entity";
+import { Appointment } from "../appointments/appointments.entity";
 
 /**
  * Entidad Paciente

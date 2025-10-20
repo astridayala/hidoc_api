@@ -15,6 +15,7 @@ import { ProceduresModule } from './procedures/procedures.module';
 import { PaymentsModule } from './payments/payments.module';
 import { TreatmentStatusesModule } from './treatment_statuses/treatment_statuses.module';
 import { AppointmentsModule } from './appointments/appointments.module';
+import { DoctorsModule } from './doctors/doctors.module';
 
 /**
  * Módulo principal de la aplicación
@@ -25,6 +26,7 @@ import { AppointmentsModule } from './appointments/appointments.module';
     // Configuración de variables de entorno
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
     }),
     
     // Configuración de la base de datos
@@ -43,6 +45,7 @@ import { AppointmentsModule } from './appointments/appointments.module';
     PaymentsModule,
     TreatmentStatusesModule,
     AppointmentsModule,
+    DoctorsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

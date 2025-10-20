@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Patient } from './patient.entity';
+import { Patient } from './patient.old.entity';
 import { Repository } from 'typeorm';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { MedicalRecordService } from 'src/medical_record/medical_record.service';

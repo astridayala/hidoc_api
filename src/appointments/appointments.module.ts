@@ -3,15 +3,13 @@ import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Appointment } from './appointments.entity';
+import { Patient } from '../users/entities/patient.entity';
+import { User } from '../users/entities/user.entity';
 
-/**
- * Modulo para las citas
- * Configura el repositorio y servicios relacionados con las citas
- */
 @Module({
-  imports: [TypeOrmModule.forFeature([Appointment])],
+  imports: [TypeOrmModule.forFeature([Appointment, Patient, User])],
   controllers: [AppointmentsController],
   providers: [AppointmentsService],
-  exports: [AppointmentsService]
+  exports: [AppointmentsService],
 })
 export class AppointmentsModule {}

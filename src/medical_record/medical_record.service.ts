@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MedicalRecord } from './medical_record.entity';
 import { Repository } from 'typeorm';
 import { CreateMedicalRecordDto } from './dto/create-medical_record.dto';
-import { Patient } from 'src/patients/patient.entity';
+import { Patient } from 'src/patients/patient.old.entity';
 
 /**
  * Servicio para gestionar los historiales medicos
@@ -33,9 +33,7 @@ export class MedicalRecordService {
         if(!patient) throw new NotFoundException('Paciente no encontrado')
 
         const newMedicalRecord = this.medicalRecordRepository.create({
-            patient: patient,
-            conditions: [],
-            treatments: []
+        patient: { id: patient.id } as any, // DeepPartial, suficiente para la FK
         });
         return this.medicalRecordRepository.save(newMedicalRecord);
     }

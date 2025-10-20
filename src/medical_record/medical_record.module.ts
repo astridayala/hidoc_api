@@ -3,7 +3,7 @@ import { MedicalRecordService } from './medical_record.service';
 import { MedicalRecordController } from './medical_record.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MedicalRecord } from './medical_record.entity';
-import { Patient } from 'src/patients/patient.entity';
+import { Patient } from 'src/patients/patient.old.entity';
 
 /**
  * Modulo de historial medico

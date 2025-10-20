@@ -1,58 +1,57 @@
-import { Controller, Get, UseGuards, Request, Param } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
-import { Roles } from 'src/common/decorators/roles.decorator';
 
-/**
- * Controlador de usuarios
- * Maneja endpoints para obtener información de usuarios
- */
+class UpdateMeDto {
+  name?: string;
+  email?: string; // si permites cambiar email
+}
+
+class CreateHistoryDto {
+  // Para simplificar: de momento sólo agregamos "condition"
+  // Puedes extender con 'treatment' | 'procedure' si quieres.
+  type: 'condition';
+  name: string;
+}
+
 @ApiTags('users')
 @ApiBearerAuth()
-@Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
+@Controller('v1/users')
 export class UsersController {
-    constructor(private usersService: UsersService) {}
+  constructor(private readonly users: UsersService) {}
 
-    /**
-     * Obtiene el perfil del usuario autenticado
-     * @param req - Request con información del usuario autenticado
-     * @returns Datos del usuario autenticado
-     */
-    @Get('profile')
-    @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
-    @ApiResponse({status: 200, description: 'Perfil obtenido exitosamente' })
-    getProfile(@Request() req) {
-        return req.user;
-    }
+  @Get('me')
+  @ApiOperation({ summary: 'Datos de perfil del usuario autenticado' })
+  async me(@CurrentUser() user: any) {
+    return this.users.getMe(user.id);
+  }
 
-    /**
-     * Obtiene todos los usuarios (solo para administradores)
-     * @returns Lista de todos los usuarios
-     */
-    @Get()
-    @Roles('admin')
-    @ApiOperation({ summary: 'Obtener todos los usuario (solo admin)' })
-    @ApiResponse({ status: 200, description: 'Lista de usuarios obtenida exitosamente' })
-    @ApiResponse({ status: 403, description: 'Acceso denegado' })
-    findAll() {
-        return this.usersService.findAll();
-    }
+  @Patch('me')
+  @ApiOperation({ summary: 'Actualizar perfil (name/email)' })
+  async updateMe(@CurrentUser() user: any, @Body() dto: UpdateMeDto) {
+    return this.users.updateMe(user.id, dto);
+  }
 
-    /**
-     * Obtiene un usuario por su ID (solo para administradores)
-     * @param id - ID del usuario a buscar
-     * @returns Datos del usuario encontradp
-     */
-    @Get(':id')
-    @Roles('admin')
-    @ApiOperation({ summary: 'Obtener un usuario por ID (solo admin)' })
-    @ApiResponse({ status: 200, description: 'Usuario obtenido exitosamente' })
-    @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
-    @ApiResponse({ status: 403, description: 'Acceso denegado' })
-    findOne(@Param('id') id: string) {
-        return this.usersService.findOne(id);
-    }
+  @Get('me/history')
+  @ApiOperation({ summary: 'Listar historial médico (conditions, treatments, procedures, payments)' })
+  async myHistory(@CurrentUser() user: any) {
+    return this.users.getMyHistory(user);
+  }
+
+  @Post('me/history')
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Crear entrada de historial (ahora: condition)' })
+  async createHistory(@CurrentUser() user: any, @Body() dto: CreateHistoryDto) {
+    return this.users.createHistoryEntry(user, dto);
+  }
+
+  @Delete('me/history/:id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Eliminar entrada (ahora: medical_record_condition.id)' })
+  async deleteHistory(@CurrentUser() user: any, @Param('id') id: string) {
+    await this.users.deleteHistoryEntry(user, id);
+  }
 }

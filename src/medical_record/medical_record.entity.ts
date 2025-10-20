@@ -1,27 +1,29 @@
-import { Patient } from "src/patients/patient.entity";
-import { CreateDateColumn, Entity, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
-import { MedicalRecordCondition } from "src/medical_record_conditions/medical_record_condition.entity";
-import { Treatment } from "src/treatments/treatment.entity";
+import {
+  Entity, PrimaryGeneratedColumn, OneToOne, OneToMany, JoinColumn, CreateDateColumn
+} from 'typeorm';
+import { Patient } from '../users/entities/patient.entity';
+import { Treatment } from '../treatments/treatment.entity';
+import { MedicalRecordCondition } from '../medical_record_conditions/medical_record_condition.entity';
 
-/**
- * Entidad Historial Medico
- * Representa a todos los historiales de los pacientes
- */
 @Entity('medical_record')
 export class MedicalRecord {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @OneToOne(() => Patient, patient => patient.medicalRecord)
-    @JoinColumn({ name: 'patient_id' })
-    patient: Patient;
+  @OneToOne(() => Patient, (p) => p.medicalRecordId, { onDelete: 'CASCADE' })
+  @JoinColumn() // name por defecto 'patientId' si tienes la columna
+  patient: Patient;
 
-    @OneToMany(() => MedicalRecordCondition, mrc => mrc.medicalRecord, { cascade: true })
-    conditions: MedicalRecordCondition[];
+  @OneToMany(() => Treatment, (t) => t.medicalRecord)
+  treatments: Treatment[];
 
-    @OneToMany(() => Treatment, treatment => treatment.medicalRecord, { cascade:true })
-    treatments: Treatment[];
+  @CreateDateColumn({ name: 'createdAt' })
+  createdAt: Date;
 
-    @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+  @OneToMany(
+    () => MedicalRecordCondition,
+    (mrc) => mrc.medicalRecord,
+    { cascade: false }
+  )
+  conditions: MedicalRecordCondition[];
 }

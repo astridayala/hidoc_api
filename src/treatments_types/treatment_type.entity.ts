@@ -1,5 +1,5 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { Treatment } from "src/treatments/treatment.entity";
+import { Treatment } from '../treatments/treatment.entity';
 
 /**
  * Entidad Tipos de Tratamientos
@@ -13,6 +13,6 @@ export class TreatmentType {
     @Column({ unique: true })
     name: string;
 
-    @OneToMany(() => Treatment, treatment => treatment.treatmentType)
+   @OneToMany(() => Treatment, (t) => t.treatmentType)
     treatments: Treatment[];
 }

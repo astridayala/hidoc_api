@@ -1,4 +1,4 @@
-import { Procedure } from "src/procedures/procedure.entity";
+import { Procedure } from "../procedures/procedure.entity";
 import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 
 /**
