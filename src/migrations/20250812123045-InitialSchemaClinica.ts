@@ -69,8 +69,7 @@ export class InitialSchemaClinica20250812123045 implements MigrationInterface {
         "address" TEXT,
         "medicalRecordId" uuid UNIQUE,
         "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-        CONSTRAINT "FK_patient_medicalRecord" FOREIGN KEY ("medicalRecordId") REFERENCES "medical_record" ("id") ON DELETE CASCADE
-      );
+        CONSTRAINT "FK_patient_medicalRecord" FOREIGN KEY ("medicalRecordId") REFERENCES "medical_record" ("id") ON DELETE CASCADE);
     `);
 
     // Crear tabla de relacion entre historial y padecimientos
