@@ -54,7 +54,7 @@ export class PaymentsController {
      * @returns true si se elimino correctamente
      */
     @Delete(':id')
-    @ApiOperation({ summary: 'Elimina un tratamiento' })
+    @ApiOperation({ summary: 'Elimina un Pago' })
     @ApiResponse({ status: 200, description: 'Pago eliminado exitosamente' })
     @ApiResponse({ status: 404, description: 'Pago no encontrado' })
     remove(@Param('id') id: string) {
