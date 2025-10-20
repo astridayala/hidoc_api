@@ -1,10 +1,16 @@
-import { Column, CreateDateColumn, Entity, Index, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Patient } from './patient.entity';
 
 export enum UserRole {
   Doctor   = 'doctor',
   Paciente = 'paciente',
-  // En tu migración existe 'admin', pero no lo usaremos.
 }
 
 @Entity('user')
@@ -23,7 +29,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
-    enumName: 'user_role_enum', // <- coincide con la migración
+    enumName: 'user_role_enum', // coincide con tu migración
     default: UserRole.Doctor,
   })
   role: UserRole;
@@ -34,7 +40,6 @@ export class User {
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
 
-  // --- relaciones ---
-  @OneToOne(() => Patient, (p) => p.user, { cascade: false })
+  @OneToOne(() => Patient, (p) => p.user, { cascade: false, nullable: true })
   patient?: Patient;
 }
