@@ -8,16 +8,28 @@ import {
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
-// Si tienes un enum/Type para rol, puedes importarlo aquí.
-// De lo contrario, dejamos string.
-type UserRole = 'doctor' | 'paciente' | 'admin';
+// Enum real de BD (minúsculas/español)
+type DbRole = 'doctor' | 'paciente' | 'admin';
 
-interface CreateUserInput {
+export interface CreateUserInput {
   name: string;
   email: string;
-  password: string;     // en texto plano: aquí se hace el hash
-  role?: UserRole;      // por defecto 'doctor'
+  password: string;
+  role: DbRole | string;
+  professionalId?: string | null;
+  specialty?: string;     // ← opcional
 }
+
+
+// Normalizador definitivo: convierte lo que venga a enum de BD
+function normalizeDbRole(input?: string | null): DbRole {
+  const up = String(input ?? '').toUpperCase();
+  if (up === 'DOCTOR') return 'doctor';
+  if (up === 'PATIENT' || up === 'PACIENTE') return 'paciente';
+  if (up === 'ADMIN') return 'admin';
+  return 'paciente';
+}
+
 
 @Injectable()
 export class UsersService {
@@ -31,51 +43,87 @@ export class UsersService {
   async findByEmail(email: string) {
     const rows = await this.ds.query(
       `SELECT id, email, name, role, password, "createdAt"
-       FROM "user"
-       WHERE email = $1
-       LIMIT 1`,
+         FROM "user" WHERE email = $1 LIMIT 1`,
       [email],
     );
     return rows[0] || null;
   }
 
-  /** Busca usuario por id (útil para JwtStrategy.validate) */
   async findOne(id: string) {
     const rows = await this.ds.query(
       `SELECT id, email, name, role, "createdAt"
-       FROM "user"
-       WHERE id = $1
-       LIMIT 1`,
+         FROM "user" WHERE id = $1 LIMIT 1`,
       [id],
     );
     return rows[0] || null;
   }
 
   /**
-   * Crea un usuario (hace hash del password).
-   * Devuelve el usuario sin el campo password.
+   * Crea el usuario y, según el rol, crea fila en patient o doctor_profile (transacción).
    */
-  async create(data: Partial<CreateUserInput>) {
-    if (!data?.email || !data?.password || !data?.name) {
-      throw new BadRequestException('Faltan campos para crear usuario');
-    }
-
-    // ¿ya existe el email?
-    const existing = await this.findByEmail(data.email);
-    if (existing) throw new ConflictException('El email ya está registrado');
-
-    const hash = await bcrypt.hash(String(data.password), 10);
-    const role: UserRole = (data.role as UserRole) ?? 'doctor';
-
-    const inserted = await this.ds.query(
-      `INSERT INTO "user"(email, name, role, password)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, email, name, role, "createdAt"`,
-      [data.email, data.name, role, hash],
-    );
-
-    return inserted[0];
+  // Dentro de UsersService
+async create(data: Partial<CreateUserInput>) {
+  // Validaciones mínimas
+  if (!data?.email || !data?.password || !data?.name) {
+    throw new BadRequestException('Faltan campos para crear usuario');
   }
+
+  // ¿ya existe el email?
+  const existing = await this.findByEmail(data.email);
+  if (existing) {
+    throw new ConflictException('El email ya está registrado');
+  }
+
+  // Hash de contraseña (si no viene ya hasheada)
+  const isBcrypt =
+    typeof data.password === 'string' && data.password.startsWith('$2b$');
+  const passwordHash = isBcrypt
+    ? String(data.password)
+    : await bcrypt.hash(String(data.password), 12);
+
+  // Normaliza el rol a enum de BD
+  const role: DbRole = normalizeDbRole(String(data.role ?? ''));
+
+  // Transacción: crea usuario y su perfil por rol
+  return await this.ds.transaction(async (trx) => {
+    // 1) Insert en tabla "user"
+    const userRes = await trx.query(
+      `INSERT INTO "user"(email, name, role, password)
+       VALUES ($1, $2, $3::user_role_enum, $4)
+       RETURNING id, email, name, role, "createdAt"`,
+      [data.email, data.name, role, passwordHash],
+    );
+    const user = userRes[0];
+
+    // 2) Según rol, crea registro en patient o doctor_profile
+    if (role === 'paciente') {
+      await trx.query(
+        `INSERT INTO "patient"("userId", name, email)
+         VALUES ($1, $2, $3)`,
+        [user.id, user.name, user.email],
+      );
+    } else if (role === 'doctor') {
+  const professionalId = data.professionalId ?? null;
+
+  // Defaults seguros si no llegan en el registro
+  const specialty = (data as any).specialty ?? 'General';
+  const price = 0;           // entero
+  const rating = 0;          // numeric(3,2)
+  const about = null;        // text
+  const isOnline = false;    // boolean
+
+  await trx.query(
+        `INSERT INTO "doctor_profile"
+          ("user_id", "fullName", "specialty", "price", "rating", "about", "isOnline", "professionalId")
+        VALUES ($1,       $2,        $3,         $4,     $5,       $6,      $7,         $8)`,
+        [ user.id, user.name, specialty, price, rating, about, isOnline, professionalId ],
+      );
+    }
+    // (role === 'admin') -> sin perfil adicional por ahora
+
+    return user; // devuelve el usuario (sin password)
+  });
+}
 
   // =========================
   // PERFIL (me)
@@ -123,49 +171,39 @@ export class UsersService {
   // HISTORIAL (me/history)
   // =========================
 
-  /**
-   * Obtiene el patient actual vinculado al usuario.
-   * Heurística: buscar patient por email = user.email.
-   */
-  // Busca por userId si existe la columna, si no cae a email
-private async findPatientForUserOrNull(user: any) {
-  // 1) por userId (si ya migraste AddUserIdToPatient)
-  const byUser = await this.ds.query(
-    `SELECT * FROM "patient" WHERE "userId" = $1 LIMIT 1`,
-    [user.id],
-  );
-  if (byUser[0]) return byUser[0];
+  private async findPatientForUserOrNull(user: any) {
+    const byUser = await this.ds.query(
+      `SELECT * FROM "patient" WHERE "userId" = $1 LIMIT 1`,
+      [user.id],
+    );
+    if (byUser[0]) return byUser[0];
 
-  // 2) fallback por email (si aún no hay vínculo)
-  const byEmail = await this.ds.query(
-    `SELECT * FROM "patient" WHERE email = $1 LIMIT 1`,
-    [user.email],
-  );
-  return byEmail[0] || null;
-}
+    const byEmail = await this.ds.query(
+      `SELECT * FROM "patient" WHERE email = $1 LIMIT 1`,
+      [user.email],
+    );
+    return byEmail[0] || null;
+  }
 
-private async ensureMedicalRecordId(patient: any) {
-  // el driver de pg devuelve snake/lowercase en keys: normalizamos
-  const current = patient.medicalRecordId ?? patient.medicalrecordid;
-  if (current) return current;
+  private async ensureMedicalRecordId(patient: any) {
+    const current = patient.medicalRecordId ?? patient.medicalrecordid;
+    if (current) return current;
 
-  const rec = await this.ds.query(
-    `INSERT INTO "medical_record" DEFAULT VALUES RETURNING id`,
-  );
-  const recordId = rec[0].id;
+    const rec = await this.ds.query(
+      `INSERT INTO "medical_record" DEFAULT VALUES RETURNING id`,
+    );
+    const recordId = rec[0].id;
 
-  await this.ds.query(
-    `UPDATE "patient" SET "medicalRecordId" = $1 WHERE id = $2`,
-    [recordId, patient.id],
-  );
-  return recordId;
-}
-
+    await this.ds.query(
+      `UPDATE "patient" SET "medicalRecordId" = $1 WHERE id = $2`,
+      [recordId, patient.id],
+    );
+    return recordId;
+  }
 
   async getMyHistory(user: any) {
     const patient = await this.findPatientForUserOrNull(user);
     if (!patient) {
-      // No hay perfil de paciente aún
       return {
         patient: null,
         medicalRecordId: null,
@@ -246,7 +284,6 @@ private async ensureMedicalRecordId(patient: any) {
 
     const medicalRecordId = await this.ensureMedicalRecordId(patient);
 
-    // 1) Crear/recuperar condition
     const existing = await this.ds.query(
       `SELECT id FROM "condition" WHERE name = $1 LIMIT 1`,
       [dto.name.trim()],
@@ -265,7 +302,6 @@ private async ensureMedicalRecordId(patient: any) {
       conditionId = created[0].id;
     }
 
-    // 2) Vincular al medical_record
     const link = await this.ds.query(
       `INSERT INTO "medical_record_condition"("medical_record_id","condition_id")
        VALUES ($1,$2)
@@ -282,7 +318,6 @@ private async ensureMedicalRecordId(patient: any) {
 
     const medicalRecordId = await this.ensureMedicalRecordId(patient);
 
-    // Aseguramos pertenencia
     const row = await this.ds.query(
       `SELECT id
          FROM "medical_record_condition"

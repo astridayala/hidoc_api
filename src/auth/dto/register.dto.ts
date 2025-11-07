@@ -1,24 +1,54 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsNotEmpty, IsString, MinLength } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsEmail, IsString, MinLength, IsEnum, IsBoolean,
+  ValidateIf, IsOptional
+} from 'class-validator';
 
-/**
- * DTO para registro de usuarios
- * Define y valida los datos necesarios para registrar un usuario
- */
+export enum UserRoleApi {
+  PATIENT = 'PATIENT',
+  DOCTOR  = 'DOCTOR',
+  ADMIN   = 'ADMIN',
+}
+
 export class RegisterDto {
-    @ApiProperty( { example: 'usuario@ejemplo.com', description: 'Email del usuario' })
-    @IsEmail({}, { message: 'Debe proporcionar un email válido'})
-    @IsNotEmpty( {message: 'El email es requerido'} )
-    email: string
+  @ApiProperty({ example: 'Ana Pérez' })
+  @IsString()
+  @MinLength(2)
+  fullName!: string;
 
-    @ApiProperty({ example: 'Juan Pérez', description: 'Nombre completo del usuario' })
-    @IsString({ message: 'El nombre debe ser una cadena de texto' })
-    @IsNotEmpty({ message: 'El nombre es requerido' })
-    name: string;
+  @ApiProperty({ example: 'ana@example.com' })
+  @IsEmail()
+  email!: string;
 
-    @ApiProperty({ example: 'Contraseña123', description: 'Contraseña del usuario' })
-    @IsString({ message: 'La contraseña debe ser una cadena de texto' })
-    @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
-    @IsNotEmpty({ message: 'La contraseña es requerida' })
-    password: string;
+  @ApiProperty({ example: 'Secreta123!' })
+  @IsString()
+  @MinLength(6)
+  password!: string;
+
+  @ApiProperty({ enum: UserRoleApi, example: UserRoleApi.PATIENT })
+  @IsEnum(UserRoleApi)
+  role!: UserRoleApi;
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  acceptTerms!: boolean;
+
+  // SOLO para doctores
+  @ApiPropertyOptional({ example: 'JVPM-123456' })
+  @ValidateIf(o => o.role === UserRoleApi.DOCTOR)
+  @IsString()
+  @MinLength(3)
+  professionalId?: string;
+
+  @ApiPropertyOptional({ example: 'Cardiología' })
+  @ValidateIf(o => o.role === UserRoleApi.DOCTOR)
+  @IsOptional()
+  @IsString()
+  specialty?: string; // ← opcional; si no viene, pondremos 'General'
+
+  @ApiPropertyOptional({ description: 'Confirmación de Junta de Vigilancia' })
+  @ValidateIf(o => o.role === UserRoleApi.DOCTOR)
+  @IsOptional()
+  @IsBoolean()
+  medicalBoardAck?: boolean; // ← ahora el request es válido
 }
