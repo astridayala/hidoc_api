@@ -4,6 +4,8 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { Role } from 'src/common/enums/role.enum';
 
 /**
  * Controlador de pacientes
@@ -33,6 +35,7 @@ export class PatientsController {
      * @returns Lista de todos los pacientes
      */
     @Get()
+    @Roles(Role.Doctor) 
     @ApiOperation({ summary: 'Obtener todos los pacientes' })
     @ApiResponse({ status: 200, description: 'Lista de pacientes obtenida exitosamente' })
     findAll() {
@@ -45,6 +48,7 @@ export class PatientsController {
      * @returns Datos del paciente encontrado
      */
     @Get(':id')
+    @Roles(Role.Doctor) 
     @ApiOperation({ summary: 'Obtener un paciente por ID' })
     @ApiResponse({ status: 200, description: 'Paciente obtenido exitosamente' })
     @ApiResponse({ status: 404, description: 'Paciente no encontrado' })

@@ -7,7 +7,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -32,44 +31,66 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { AppointmentsService } from './appointments.service';
-import { CreateAppointmentsDto, CancelAppointmentDto } from './dto/appointments.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
-import { CreateAppointmentDoctorDto } from './dto/create-appointment.dto';
+import { IsISO8601, IsOptional, IsString, IsUUID } from 'class-validator';
 
-/* ===================== DTOs para Swagger ===================== */
+/* ===================== DTOs ===================== */
 
+export class CreateAppointmentDto {
+  @IsUUID()
+  doctorUserId: string;
+
+  @IsISO8601()
+  scheduledAt: string; // ISO string
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class CancelAppointmentDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+/* Para Swagger de respuesta (shape simplificado y alineado a tu tabla) */
 class AppointmentResponseDto {
   @ApiProperty({ example: 'b1a9c6d7-0a4b-4c0f-bef3-9e2b4e2f8a9a' })
   id: string;
 
-  @ApiProperty({ example: 'b3e8e9cb-9d02-4e3b-9d1a-6f3a0b5c1d21' })
-  doctorId: string;
-
   @ApiProperty({ example: 'a5f4d4c6-1c0a-4c36-8f2b-7d2f0a0be3d1' })
   patientId: string;
 
+  @ApiProperty({ example: 'b3e8e9cb-9d02-4e3b-9d1a-6f3a0b5c1d21' })
+  doctorUserId: string;
+
   @ApiProperty({
     example: '2025-10-23T14:00:00.000Z',
-    description: 'Fecha y hora de inicio de la cita',
+    description: 'Fecha/hora programada',
   })
-  start: string;
+  scheduledAt: string;
 
   @ApiProperty({
-    example: '2025-10-23T14:30:00.000Z',
-    description: 'Fecha y hora de finalización de la cita',
+    example: 'CONFIRMED',
+    enum: ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'],
   })
-  end: string;
-
-  @ApiProperty({ example: 'PENDING', enum: ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'] })
   status: string;
 
-  @ApiProperty({ example: 'Chequeo rutinario' })
+  @ApiProperty({ example: 'Consulta general' })
   reason: string;
+
+  @ApiProperty({ example: 'Notas internas / observaciones' })
+  note: string;
 
   @ApiProperty({
     example: '2025-10-10T15:20:11.000Z',
-    description: 'Fecha de creación de la cita',
+    description: 'Fecha de creación',
   })
   createdAt: string;
 }
@@ -90,31 +111,32 @@ export class AppointmentsController {
   @ApiOperation({
     summary: 'Crea una cita',
     description:
-      'Permite a un paciente agendar una cita médica con un doctor. Requiere autenticación y rol de paciente.',
+      'El paciente autenticado agenda una cita con un doctor. El patientId se infiere del usuario (no viene en el body).',
   })
   @ApiBody({
-    type: CreateAppointmentsDto,
+    type: CreateAppointmentDto,
     examples: {
       default: {
-        summary: 'Ejemplo de creación de cita',
+        summary: 'Ejemplo de creación',
         value: {
-          doctorId: 'b3e8e9cb-9d02-4e3b-9d1a-6f3a0b5c1d21',
-          start: '2025-10-23T14:00:00.000Z',
-          end: '2025-10-23T14:30:00.000Z',
-          reason: 'Consulta de seguimiento',
+          doctorUserId: 'b3e8e9cb-9d02-4e3b-9d1a-6f3a0b5c1d21',
+          scheduledAt: '2025-10-23T14:00:00.000Z',
+          reason: 'Chequeo',
+          note: 'Traer exámenes',
         },
       },
     },
   })
   @ApiCreatedResponse({
-    description: 'Cita creada exitosamente',
+    description: 'Cita creada',
     type: AppointmentResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Datos inválidos o conflicto de horario' })
-  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
-  @ApiForbiddenResponse({ description: 'El usuario no tiene rol de paciente' })
-  create(@Body() dto: CreateAppointmentsDto) {
-    return this.appointmentsService.create(dto);
+  @ApiBadRequestResponse({ description: 'Datos inválidos o conflicto' })
+  @ApiUnauthorizedResponse({ description: 'No autenticado' })
+  @ApiForbiddenResponse({ description: 'No es paciente' })
+  create(@Body() dto: CreateAppointmentDto, @Request() req) {
+    // req.user viene de JwtStrategy.validate()
+    return this.appointmentsService.createForAuthenticatedPatient(req.user.id, dto);
   }
 
   /* ------------ GET /v1/appointments ------------ */
@@ -122,19 +144,29 @@ export class AppointmentsController {
   @Roles(Role.Doctor)
   @ApiOperation({
     summary: 'Obtener todas las citas (doctor/auditoría)',
-    description:
-      'Devuelve todas las citas registradas. Acceso restringido a doctores o roles de auditoría.',
+    description: 'Devuelve todas las citas registradas.',
   })
   @ApiOkResponse({
     description: 'Listado de citas',
-    schema: {
-      type: 'array',
-      items: { $ref: getSchemaPath(AppointmentResponseDto) },
-    },
+    schema: { type: 'array', items: { $ref: getSchemaPath(AppointmentResponseDto) } },
   })
-  @ApiForbiddenResponse({ description: 'Acceso denegado para este rol' })
   findAll() {
     return this.appointmentsService.findAll();
+  }
+
+  /* ------------ GET /v1/appointments/me ------------ */
+  @Get('me')
+  @Roles(Role.Paciente)
+  @ApiOperation({
+    summary: 'Citas del paciente autenticado',
+    description: 'Devuelve las citas del paciente autenticado (para Actividad Reciente).',
+  })
+  @ApiOkResponse({
+    description: 'Listado de mis citas',
+    schema: { type: 'array', items: { $ref: getSchemaPath(AppointmentResponseDto) } },
+  })
+  findMine(@Request() req) {
+    return this.appointmentsService.findByPatientUserId(req.user.id);
   }
 
   /* ------------ GET /v1/appointments/:id ------------ */
@@ -148,38 +180,10 @@ export class AppointmentsController {
     example: 'b1a9c6d7-0a4b-4c0f-bef3-9e2b4e2f8a9a',
     description: 'UUID de la cita',
   })
-  @ApiOkResponse({
-    description: 'Cita encontrada',
-    type: AppointmentResponseDto,
-  })
+  @ApiOkResponse({ description: 'Cita encontrada', type: AppointmentResponseDto })
   @ApiNotFoundResponse({ description: 'Cita no encontrada' })
   findOne(@Param('id') id: string) {
     return this.appointmentsService.findOne(id);
-  }
-
-  /* ------------ GET /v1/appointments/patient/:patientId ------------ */
-  @Get('patient/:patientId')
-  @Roles(Role.Paciente)
-  @ApiOperation({
-    summary: 'Obtiene las citas de un paciente',
-    description:
-      'Devuelve el historial de citas de un paciente autenticado o con permisos. Acceso restringido a rol de paciente.',
-  })
-  @ApiParam({
-    name: 'patientId',
-    example: 'a5f4d4c6-1c0a-4c36-8f2b-7d2f0a0be3d1',
-    description: 'ID del paciente',
-  })
-  @ApiOkResponse({
-    description: 'Listado de citas del paciente',
-    schema: {
-      type: 'array',
-      items: { $ref: getSchemaPath(AppointmentResponseDto) },
-    },
-  })
-  @ApiForbiddenResponse({ description: 'No autorizado a consultar citas de otro paciente' })
-  appointmentsByPatient(@Param('patientId') patientId: string) {
-    return this.appointmentsService.findByPatient(patientId);
   }
 
   /* ------------ PATCH /v1/appointments/:id/cancel ------------ */
@@ -189,30 +193,16 @@ export class AppointmentsController {
   @ApiOperation({
     summary: 'Cancelar una cita',
     description:
-      'Permite que un paciente cancele una cita activa indicando la razón. No elimina el registro, solo cambia su estado.',
+      'Cambia el estado a CANCELLED. Guarda el motivo en la nota concatenada.',
   })
-  @ApiParam({
-    name: 'id',
-    example: 'b1a9c6d7-0a4b-4c0f-bef3-9e2b4e2f8a9a',
-    description: 'UUID de la cita',
-  })
+  @ApiParam({ name: 'id', example: 'b1a9c6d7-0a4b-4c0f-bef3-9e2b4e2f8a9a' })
   @ApiBody({
     type: CancelAppointmentDto,
-    examples: {
-      default: {
-        summary: 'Ejemplo de cancelación',
-        value: { reason: 'Ya no puedo asistir a la hora indicada' },
-      },
-    },
+    examples: { default: { value: { reason: 'No podré asistir' } } },
   })
-  @ApiOkResponse({
-    description: 'Cita cancelada correctamente',
-    type: AppointmentResponseDto,
-  })
-  @ApiBadRequestResponse({ description: 'Cita ya cancelada o completada' })
-  @ApiForbiddenResponse({ description: 'El usuario no tiene permiso para cancelar esta cita' })
-  cancel(@Param('id') id: string, @Body() body: CancelAppointmentDto) {
-    return this.appointmentsService.cancel(id, body.reason);
+  @ApiOkResponse({ description: 'Cita cancelada', type: AppointmentResponseDto })
+  cancel(@Param('id') id: string, @Body() body: CancelAppointmentDto, @Request() req) {
+    return this.appointmentsService.cancel(id, body.reason, req.user);
   }
 
   /* ------------ DELETE /v1/appointments/:id ------------ */
@@ -220,54 +210,12 @@ export class AppointmentsController {
   @Roles(Role.Doctor)
   @ApiOperation({
     summary: 'Elimina una cita',
-    description:
-      'Permite eliminar una cita del sistema (uso reservado a doctores o administradores).',
+    description: 'Uso reservado a doctores o administradores.',
   })
-  @ApiParam({
-    name: 'id',
-    example: 'b1a9c6d7-0a4b-4c0f-bef3-9e2b4e2f8a9a',
-    description: 'UUID de la cita',
-  })
-  @ApiNoContentResponse({ description: 'Cita eliminada correctamente' })
-  @ApiForbiddenResponse({ description: 'Solo doctores o administradores pueden eliminar citas' })
+  @ApiParam({ name: 'id', example: 'b1a9c6d7-0a4b-4c0f-bef3-9e2b4e2f8a9a' })
+  @ApiNoContentResponse({ description: 'Cita eliminada' })
   remove(@Param('id') id: string) {
     return this.appointmentsService.remove(id);
   }
 
-  @Post('doctor')
-  @Roles(Role.Doctor)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiOperation({
-        summary: 'Permite al doctor crear una cita',
-        description: 'El doctor crea una cita para un paciente. El doctor se toma del token JWT.',
-    })
-    @ApiBody({
-        // Se asegura que el esquema refleje el DTO que solo pide patientId, start, end, reason, y note
-        type: CreateAppointmentDoctorDto,
-        examples: {
-            default: {
-                summary: 'Ejemplo de cita creada por doctor',
-                value: {
-                    patientId: 'a5f4d4c6-1c0a-4c36-8f2b-7d2f0a0be3d1',
-                    start: '2025-10-23T14:00:00.000Z',
-                    end: '2025-10-23T14:30:00.000Z',
-                    reason: 'Consulta de seguimiento',
-                    note: 'Revisión postoperatoria (opcional)', // Usamos 'note' para el campo opcional
-                },
-            },
-        },
-    })
-    @ApiCreatedResponse({
-        description: 'Cita creada exitosamente por el doctor',
-        type: AppointmentResponseDto,
-    })
-    @ApiForbiddenResponse({ description: 'Solo doctores pueden usar este endpoint' })
-    createByDoctor(
-        @Body() dto: CreateAppointmentDoctorDto, // Usar el DTO correcto
-        @Request() req, // Para obtener el usuario del token
-    ) {
-        // Asegurarse de que el objeto req.user.id esté disponible por el JwtAuthGuard
-        const doctorUserId = req.user.id; 
-        return this.appointmentsService.createByDoctor(dto, doctorUserId);
-    }
 } 

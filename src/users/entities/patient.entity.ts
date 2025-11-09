@@ -4,6 +4,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Appointment } from '../../appointments/appointments.entity';
+import { CitaDoctor } from 'src/citas/citas.entity';
 
 export enum PatientGender {
   Femenino  = 'femenino',
@@ -58,6 +59,9 @@ export class Patient {
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
 
-  @OneToMany(() => Appointment, (a) => a.patient)
+  @OneToMany(() => Appointment, (a) => a.patientId)
   appointments?: Appointment[];
+
+  @OneToMany(() => CitaDoctor, cita => cita.patient)
+      citas: CitaDoctor[];
 }

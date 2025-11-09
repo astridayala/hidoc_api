@@ -9,6 +9,9 @@ import { Appointment } from '../../appointments/appointments.entity';
 import { MedicalRecord } from '../../medical_record/medical_record.entity';
 import { MedicalRecordCondition } from 'src/medical_record_conditions/medical_record_condition.entity';
 import { Treatment } from '../../treatments/treatment.entity';
+import { CitaDoctor } from 'src/citas/citas.entity';
+import { Procedure } from 'src/procedures/procedure.entity';
+import { Payment } from 'src/payments/payment.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -29,6 +32,10 @@ export const AppDataSource = new DataSource({
     Appointment,
     MedicalRecord, 
     MedicalRecordCondition,
-    Treatment
+    Treatment,
+    CitaDoctor,
+    Procedure,
+    Treatment,
+    Payment
   ],
 });

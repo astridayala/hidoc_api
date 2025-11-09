@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { MedicalRecord } from "../medical_record/medical_record.entity";
 import { Appointment } from "../appointments/appointments.entity";
+import { CitaDoctor } from "src/citas/citas.entity";
 
 /**
  * Entidad Paciente
@@ -38,7 +39,6 @@ export class Patient {
     @OneToOne(() => MedicalRecord, record => record.patient, { cascade:true })
     medicalRecord: MedicalRecord;
     
-    @OneToMany(() => Appointment, appointment => appointment.patient)
+    @OneToMany(() => Appointment, appointment => appointment.patientId)
     appointments: Appointment[];
-    
 }
