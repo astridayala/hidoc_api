@@ -106,11 +106,11 @@ class HistoryEntryDto {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @ApiExtraModels(UserMeResponseDto, HistoryEntryDto)
-@Controller('v1/users')
+@Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
-  /* ------------ GET /v1/users/me ------------ */
+  /* ------------ GET /users/me ------------ */
   @Get('me')
   @ApiOperation({
     summary: 'Datos de perfil del usuario autenticado',
@@ -138,7 +138,7 @@ export class UsersController {
     return this.users.getMe(user.id);
   }
 
-  /* ------------ PATCH /v1/users/me ------------ */
+  /* ------------ PATCH /users/me ------------ */
   @Patch('me')
   @ApiOperation({
     summary: 'Actualizar perfil (name/email)',

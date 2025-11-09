@@ -11,7 +11,7 @@ export class MedicalRecord {
   id: string;
 
   @OneToOne(() => Patient, (p) => p.medicalRecordId, { onDelete: 'CASCADE' })
-  @JoinColumn() // name por defecto 'patientId' si tienes la columna
+  @JoinColumn({ name: 'patient_id' })
   patient: Patient;
 
   @OneToMany(() => Treatment, (t) => t.medicalRecord)

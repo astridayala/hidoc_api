@@ -9,6 +9,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -34,6 +35,7 @@ import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentsDto, CancelAppointmentDto } from './dto/appointments.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { CreateAppointmentDoctorDto } from './dto/create-appointment.dto';
 
 /* ===================== DTOs para Swagger ===================== */
 
@@ -78,7 +80,7 @@ class AppointmentResponseDto {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiExtraModels(AppointmentResponseDto)
-@Controller('v1/appointments')
+@Controller('appointments')
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
@@ -231,4 +233,41 @@ export class AppointmentsController {
   remove(@Param('id') id: string) {
     return this.appointmentsService.remove(id);
   }
+
+  @Post('doctor')
+  @Roles(Role.Doctor)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+        summary: 'Permite al doctor crear una cita',
+        description: 'El doctor crea una cita para un paciente. El doctor se toma del token JWT.',
+    })
+    @ApiBody({
+        // Se asegura que el esquema refleje el DTO que solo pide patientId, start, end, reason, y note
+        type: CreateAppointmentDoctorDto,
+        examples: {
+            default: {
+                summary: 'Ejemplo de cita creada por doctor',
+                value: {
+                    patientId: 'a5f4d4c6-1c0a-4c36-8f2b-7d2f0a0be3d1',
+                    start: '2025-10-23T14:00:00.000Z',
+                    end: '2025-10-23T14:30:00.000Z',
+                    reason: 'Consulta de seguimiento',
+                    note: 'Revisión postoperatoria (opcional)', // Usamos 'note' para el campo opcional
+                },
+            },
+        },
+    })
+    @ApiCreatedResponse({
+        description: 'Cita creada exitosamente por el doctor',
+        type: AppointmentResponseDto,
+    })
+    @ApiForbiddenResponse({ description: 'Solo doctores pueden usar este endpoint' })
+    createByDoctor(
+        @Body() dto: CreateAppointmentDoctorDto, // Usar el DTO correcto
+        @Request() req, // Para obtener el usuario del token
+    ) {
+        // Asegurarse de que el objeto req.user.id esté disponible por el JwtAuthGuard
+        const doctorUserId = req.user.id; 
+        return this.appointmentsService.createByDoctor(dto, doctorUserId);
+    }
 } 

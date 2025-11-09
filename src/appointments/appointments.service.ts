@@ -5,6 +5,7 @@ import { Repository, Between, Not } from 'typeorm';
 import { CreateAppointmentsDto } from './dto/appointments.dto';
 import { Patient } from '../users/entities/patient.entity';
 import { User } from '../users/entities/user.entity';
+import { CreateAppointmentDoctorDto } from './dto/create-appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
@@ -115,4 +116,68 @@ export class AppointmentsService {
     }
     return { message: `La cita con id ${id} fue eliminada correctamente` };
   }
+
+  /**
+   * Crea una cita iniciada por un doctor.
+   * @param dto Datos de la cita (paciente, inicio, fin, razón, nota)
+   * @param doctorUserId El ID del doctor, obtenido del token JWT.
+   */
+  async createByDoctor(dto: CreateAppointmentDoctorDto, doctorUserId: string): Promise<Appointment> {
+      const { patientId, start, end, reason, note } = dto; // Incluir 'note' del DTO
+
+      const patient = await this.patientsRepository.findOne({ where: { id: patientId } });
+      if (!patient) throw new NotFoundException('Paciente no encontrado');
+
+      // Se usa el doctorUserId inyectado desde el controlador
+      const doctorUser = await this.usersRepository.findOne({ where: { id: doctorUserId } });
+      if (!doctorUser || doctorUser.role !== 'doctor') {
+          // Este caso es poco probable si el guard Roles(Role.Doctor) está activo,
+          // pero es una buena verificación de seguridad.
+          throw new BadRequestException('Usuario autenticado no es un doctor válido');
+      }
+
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      if (!(startDate < endDate)) throw new BadRequestException('Rango de horas inválido');
+
+      // Verificar solape del paciente
+      const patientOverlap = await this.appointmentsRepository.findOne({
+          where: {
+              patient: { id: patientId },
+              // La verificación de solape debe verificar si la nueva cita
+              // comienza O termina dentro de una cita existente O si una cita
+              // existente comienza O termina dentro de la nueva cita.
+              // Usar Between en 'start' no cubre todos los casos de solape.
+              // Por simplicidad y consistencia con el método create, mantendré
+              // la lógica que has usado, pero ten en cuenta que podría no ser
+              // una comprobación de solape completa.
+              start: Between(startDate, endDate), // Solo verifica si la nueva cita comienza durante una existente
+              status: Not(AppointmentStatus.CANCELLED),
+          },
+      });
+      if (patientOverlap) throw new BadRequestException('El paciente ya tiene una cita en ese horario');
+
+      // Verificar solape del doctor
+      const doctorOverlap = await this.appointmentsRepository.findOne({
+          where: {
+              doctorUser: { id: doctorUserId },
+              start: Between(startDate, endDate), // Solo verifica si la nueva cita comienza durante una existente
+              status: Not(AppointmentStatus.CANCELLED),
+          },
+      });
+      if (doctorOverlap) throw new BadRequestException('Ya tiene una cita en ese horario');
+
+      const newAppointment = this.appointmentsRepository.create({
+          patient,
+          doctorUser, // Doctor obtenido por el ID inyectado
+          start: startDate,
+          end: endDate,
+          description: note, // Usamos 'note' como 'description' si es el caso
+          reason,
+          status: AppointmentStatus.CONFIRMED,
+      });
+
+      return this.appointmentsRepository.save(newAppointment);
+  }
+
 }

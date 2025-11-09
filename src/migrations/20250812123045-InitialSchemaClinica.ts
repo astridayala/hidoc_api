@@ -48,7 +48,7 @@ export class InitialSchemaClinica20250812123045 implements MigrationInterface {
       );
     `);
 
-    // Crear tabla de historial medico
+    // Crear medical_record primero (sin FK)
     await queryRunner.query(`
       CREATE TABLE "medical_record" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -56,7 +56,7 @@ export class InitialSchemaClinica20250812123045 implements MigrationInterface {
       );
     `);
 
-    // Crear tabla de los pacientes
+    // Crear patient (ya puede existir sin problema)
     await queryRunner.query(`
       CREATE TABLE "patient" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -68,9 +68,31 @@ export class InitialSchemaClinica20250812123045 implements MigrationInterface {
         "gender" "patient_gender_enum" NOT NULL,
         "address" TEXT,
         "medicalRecordId" uuid UNIQUE,
-        "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-        CONSTRAINT "FK_patient_medicalRecord" FOREIGN KEY ("medicalRecordId") REFERENCES "medical_record" ("id") ON DELETE CASCADE);
+        "createdAt" TIMESTAMP NOT NULL DEFAULT now()
+      );
     `);
+
+    // Agregar ahora las FK (ya existen ambas tablas)
+    await queryRunner.query(`
+      ALTER TABLE "medical_record"
+      ADD COLUMN "patient_id" uuid NOT NULL;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "medical_record"
+      ADD CONSTRAINT "FK_medical_record_patient"
+      FOREIGN KEY ("patient_id") REFERENCES "patient"("id")
+      ON DELETE CASCADE
+      ON UPDATE CASCADE;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "patient"
+      ADD CONSTRAINT "FK_patient_medicalRecord"
+      FOREIGN KEY ("medicalRecordId") REFERENCES "medical_record"("id")
+      ON DELETE CASCADE;
+    `);
+
 
     // Crear tabla de relacion entre historial y padecimientos
     await queryRunner.query(`
