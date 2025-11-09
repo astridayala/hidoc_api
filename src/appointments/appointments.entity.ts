@@ -1,5 +1,6 @@
 // appointments.entity.ts (fragmento relevante)
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+import { Patient } from '../patients/patient.old.entity';
 
 export enum AppointmentStatus {
   PENDING = 'PENDING',
@@ -41,4 +42,8 @@ export class Appointment {
 
   @Column({ name: 'createdAt', type: 'timestamp without time zone', default: () => 'now()' })
   createdAt: Date;
+
+  // Relación ManyToOne hacia Patient (permite appointment.patient en otras entidades)
+  @ManyToOne(() => Patient, (p) => p.appointments, { nullable: true })
+  patient?: Patient;
 }
