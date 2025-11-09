@@ -12,24 +12,43 @@ import * as bcrypt from 'bcrypt';
 type DbRole = 'doctor' | 'paciente' | 'admin';
 
 export interface CreateUserInput {
-  name: string;
+  name: string;                 // full name recibido desde el front
   email: string;
-  password: string;
-  role: DbRole | string;
+  password: string;             // plano o ya hasheado (se detecta)
+  role: DbRole | string;        // 'doctor' | 'paciente' | 'admin' o variantes API
   professionalId?: string | null;
-  specialty?: string;     // ← opcional
+  specialty?: string;           // opcional (para doctor_profile)
 }
 
+/* -------------------------------
+ * Helpers
+ * -----------------------------*/
 
-// Normalizador definitivo: convierte lo que venga a enum de BD
+/** Normaliza el rol que venga del API a tu enum de BD */
 function normalizeDbRole(input?: string | null): DbRole {
-  const up = String(input ?? '').toUpperCase();
+  const up = String(input ?? '').toUpperCase().trim();
   if (up === 'DOCTOR') return 'doctor';
   if (up === 'PATIENT' || up === 'PACIENTE') return 'paciente';
   if (up === 'ADMIN') return 'admin';
   return 'paciente';
 }
 
+/** Deriva first/last name a partir de un full name libre */
+function splitFullName(fullName: string): { first: string; last: string } {
+  const cleaned = fullName.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return { first: '-', last: '-' };
+
+  const parts = cleaned.split(' ');
+  if (parts.length === 1) {
+    return { first: parts[0], last: '-' }; // placeholder no nulo
+  }
+  const last = parts.pop() as string;
+  const first = parts.join(' ');
+  return {
+    first: first.length ? first : '-',
+    last: last.length ? last : '-',
+  };
+}
 
 @Injectable()
 export class UsersService {
@@ -60,70 +79,74 @@ export class UsersService {
 
   /**
    * Crea el usuario y, según el rol, crea fila en patient o doctor_profile (transacción).
+   * Acepta 'name' como full name y deriva 'lastName' para cumplir NOT NULL.
    */
-  // Dentro de UsersService
-async create(data: Partial<CreateUserInput>) {
-  // Validaciones mínimas
-  if (!data?.email || !data?.password || !data?.name) {
-    throw new BadRequestException('Faltan campos para crear usuario');
-  }
-
-  // ¿ya existe el email?
-  const existing = await this.findByEmail(data.email);
-  if (existing) {
-    throw new ConflictException('El email ya está registrado');
-  }
-
-  // Hash de contraseña (si no viene ya hasheada)
-  const isBcrypt =
-    typeof data.password === 'string' && data.password.startsWith('$2b$');
-  const passwordHash = isBcrypt
-    ? String(data.password)
-    : await bcrypt.hash(String(data.password), 12);
-
-  // Normaliza el rol a enum de BD
-  const role: DbRole = normalizeDbRole(String(data.role ?? ''));
-
-  // Transacción: crea usuario y su perfil por rol
-  return await this.ds.transaction(async (trx) => {
-    // 1) Insert en tabla "user"
-    const userRes = await trx.query(
-      `INSERT INTO "user"(email, name, role, password)
-       VALUES ($1, $2, $3::user_role_enum, $4)
-       RETURNING id, email, name, role, "createdAt"`,
-      [data.email, data.name, role, passwordHash],
-    );
-    const user = userRes[0];
-
-    // 2) Según rol, crea registro en patient o doctor_profile
-    if (role === 'paciente') {
-      await trx.query(
-        `INSERT INTO "patient"("userId", name, email)
-         VALUES ($1, $2, $3)`,
-        [user.id, user.name, user.email],
-      );
-    } else if (role === 'doctor') {
-  const professionalId = data.professionalId ?? null;
-
-  // Defaults seguros si no llegan en el registro
-  const specialty = (data as any).specialty ?? 'General';
-  const price = 0;           // entero
-  const rating = 0;          // numeric(3,2)
-  const about = null;        // text
-  const isOnline = false;    // boolean
-
-  await trx.query(
-        `INSERT INTO "doctor_profile"
-          ("user_id", "fullName", "specialty", "price", "rating", "about", "isOnline", "professionalId")
-        VALUES ($1,       $2,        $3,         $4,     $5,       $6,      $7,         $8)`,
-        [ user.id, user.name, specialty, price, rating, about, isOnline, professionalId ],
-      );
+  async create(data: Partial<CreateUserInput>) {
+    // Validaciones mínimas
+    if (!data?.email || !data?.password || !data?.name) {
+      throw new BadRequestException('Faltan campos para crear usuario');
     }
-    // (role === 'admin') -> sin perfil adicional por ahora
 
-    return user; // devuelve el usuario (sin password)
-  });
-}
+    // ¿ya existe el email?
+    const existing = await this.findByEmail(data.email);
+    if (existing) {
+      throw new ConflictException('El email ya está registrado');
+    }
+
+    // Hash de contraseña (si no viene ya hasheada)
+    const isBcrypt =
+      typeof data.password === 'string' && data.password.startsWith('$2b$');
+    const passwordHash = isBcrypt
+      ? String(data.password)
+      : await bcrypt.hash(String(data.password), 12);
+
+    // Normaliza el rol a enum de BD
+    const role: DbRole = normalizeDbRole(String(data.role ?? ''));
+
+    // Deriva nombres para patient (por si hay NOT NULL en lastName)
+    const { first, last } = splitFullName(String(data.name));
+
+    // Transacción: crea usuario y su perfil por rol
+    return await this.ds.transaction(async (trx) => {
+      // 1) Insert en tabla "user"
+      const userRes = await trx.query(
+        `INSERT INTO "user"(email, name, role, password)
+         VALUES ($1, $2, $3::user_role_enum, $4)
+         RETURNING id, email, name, role, "createdAt"`,
+        [data.email, data.name, role, passwordHash],
+      );
+      const user = userRes[0];
+
+      // 2) Según rol, crea registro en patient o doctor_profile
+      if (role === 'paciente') {
+        // Inserta con lastName derivado para cumplir NOT NULL
+        await trx.query(
+          `INSERT INTO "patient"("userId", name, "lastName", email)
+           VALUES ($1, $2, $3, $4)`,
+          [user.id, first, last, user.email],
+        );
+      } else if (role === 'doctor') {
+        const professionalId = data.professionalId ?? null;
+
+        // Defaults seguros si no llegan en el registro
+        const specialty = (data as any).specialty ?? 'General';
+        const price = 0;           // integer
+        const rating = 0;          // numeric(3,2)
+        const about = null;        // text
+        const isOnline = false;    // boolean
+
+        await trx.query(
+          `INSERT INTO "doctor_profile"
+            ("user_id", "fullName", "specialty", "price", "rating", "about", "isOnline", "professionalId")
+           VALUES ($1,       $2,        $3,         $4,     $5,       $6,      $7,         $8)`,
+          [user.id, user.name, specialty, price, rating, about, isOnline, professionalId],
+        );
+      }
+      // (role === 'admin') -> sin perfil adicional por ahora
+
+      return user; // devuelve el usuario (sin password)
+    });
+  }
 
   // =========================
   // PERFIL (me)
