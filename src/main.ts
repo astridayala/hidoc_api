@@ -10,7 +10,11 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.enableCors({
-    origin: true, 
+     origin: [
+    /http:\/\/localhost:\d+$/,            // permite PUERTOS aleatorios de Flutter web
+    'http://127.0.0.1:8080',
+    'http://localhost:8080',
+  ], 
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: false, // Bearer en header
