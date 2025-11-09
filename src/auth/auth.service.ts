@@ -99,14 +99,17 @@ export class AuthService {
   /** Refresh stateless */
   async refresh(refreshToken: string): Promise<JwtPair> {
     try {
-      const payload = this.jwt.verify(refreshToken); // usa secret del módulo
+      const secret = this.config.get<string>('JWT_SECRET', 'dev-access-secret');
+      const payload = this.jwt.verify(refreshToken, { secret }); 
       const user = await this.usersService.findOne(payload.sub);
       const safeUser = this.toPublicUser(user);
       return this.issueTokens(safeUser);
-    } catch {
+    } catch (e) {
+      // Deja claro el error como 401
       throw new UnauthorizedException('Refresh token inválido o expirado');
     }
   }
+
 
   /** Logout: placeholder */
   async logout(_userId: string): Promise<{ success: true }> {

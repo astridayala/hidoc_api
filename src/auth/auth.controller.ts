@@ -20,7 +20,12 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/logindto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
+// auth.controller.ts (arriba del controller)
+import { IsNotEmpty, IsString } from 'class-validator';
+
 class RefreshTokenDto {
+  @IsString()
+  @IsNotEmpty()
   refreshToken: string;
 }
 
