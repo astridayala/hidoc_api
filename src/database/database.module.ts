@@ -19,7 +19,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         password: configService.get('DB_PASSWORD', '1234'),
         database: configService.get('DB_DATABASE', 'hidoc-db'),
         entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-        synchronize: false,
+        synchronize: true,
         logging: configService.get('NODE_ENV') !== 'production',
       }),
     }),
