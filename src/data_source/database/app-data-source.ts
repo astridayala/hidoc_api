@@ -12,6 +12,8 @@ import { Treatment } from '../../treatments/treatment.entity';
 import { CitaDoctor } from 'src/citas/citas.entity';
 import { Procedure } from 'src/procedures/procedure.entity';
 import { Payment } from 'src/payments/payment.entity';
+import { DoctorProfile } from 'src/doctors/entities/doctor-profile.entity';
+import { DoctorCategory } from 'src/doctors/entities/doctor-category.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -32,10 +34,11 @@ export const AppDataSource = new DataSource({
     Appointment,
     MedicalRecord, 
     MedicalRecordCondition,
-    Treatment,
+    Treatment, // Eliminado el duplicado
     CitaDoctor,
     Procedure,
-    Treatment,
-    Payment
+    Payment,
+    DoctorProfile, 
+    DoctorCategory
   ],
 });

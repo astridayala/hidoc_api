@@ -63,5 +63,5 @@ export class Patient {
   appointments?: Appointment[];
 
   @OneToMany(() => CitaDoctor, cita => cita.patient)
-      citas: CitaDoctor[];
+  citas: CitaDoctor[];
 }

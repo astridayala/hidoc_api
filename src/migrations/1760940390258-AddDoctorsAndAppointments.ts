@@ -15,6 +15,7 @@ export class AddDoctorsAndAppointments1760940390258 implements MigrationInterfac
         "rating" DECIMAL(3,2) NOT NULL DEFAULT 0,
         "about" TEXT,
         "isOnline" BOOLEAN NOT NULL DEFAULT false,
+        "professionalId" VARCHAR,
         "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
         CONSTRAINT "FK_doctor_profile_user" FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE
       );

@@ -33,6 +33,9 @@ export class DoctorProfile {
   @Column({ name: 'isOnline', type: 'boolean', default: false })
   isOnline: boolean;
 
+  @Column({ name: 'professional_id' })
+  professionalId?: string;
+
   // Relación con categorías (tabla puente doctor_category_on_doctor)
   @ManyToMany(() => DoctorCategory, (c) => c.doctors, { eager: false })
   @JoinTable({
