@@ -23,7 +23,13 @@ export class PaymentsService {
     async create(createPaymentsDto: CreatePaymentsDto): Promise<Payment> {
         const { procedureId, date, amount } = createPaymentsDto;
 
-        const [year, month, day] = date.split('/').map(Number);
+        // Aceptar formato YYYY/MM/DD o YYYY-MM-DD
+        const parts = date.split(/[-\\/]/).map(Number);
+        if (parts.length !== 3) {
+            throw new Error('La fecha debe tener el formato YYYY/MM/DD o YYYY-MM-DD');
+        }
+
+        const [year, month, day] = parts;
 
         if (
             isNaN(year) || isNaN(month) || isNaN(day) ||
@@ -32,16 +38,25 @@ export class PaymentsService {
             throw new Error('La fecha contiene valores inválidos');
         }
 
-        const paymentDate = new Date(year, month - 1, day);
+        // Usar formato ISO (YYYY-MM-DD) para la columna date
+        const isoDate = `${year.toString().padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
+        // Normalizar monto a string con 2 decimales (la columna es numeric almacenada como string)
+        const amountNum = typeof amount === 'number' ? amount : Number(amount);
+        if (Number.isNaN(amountNum)) {
+            throw new Error('El monto es inválido');
+        }
+        const amountStr = amountNum.toFixed(2);
 
         const newPayment = this.paymentsRepository.create({
-            date: paymentDate,
-            amount,
-            procedure: { id: procedureId }
-        });
+            date: isoDate,
+            amount: amountStr,
+            procedure: procedureId ? ({ id: procedureId } as any) : null,
+        } as any);
 
-        return this.paymentsRepository.save(newPayment);
-}
+        const saved = await this.paymentsRepository.save(newPayment) as unknown as Payment;
+        return saved;
+    }
     
 
     /**
@@ -58,10 +73,7 @@ export class PaymentsService {
      * @returns El pago encontrado
      */
     async findOne(id: string): Promise<Payment> {
-        const payment = await this.paymentsRepository.findOne({
-            where: { id },
-            relations: ['procedure']
-        });
+    const payment = await this.paymentsRepository.findOne({ where: { id }, relations: ['procedure'] });
 
         if (!payment) throw new NotFoundException(`Pago con id ${id} no encontrado`);
 
