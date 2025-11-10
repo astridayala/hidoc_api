@@ -42,7 +42,6 @@ export class DoctorProfile {
   })
   categories: DoctorCategory[];
 
-  // ✅ Relación inversa que te faltaba
   @OneToMany(() => AvailabilitySlot, (s) => s.doctor, { eager: false })
   availability: AvailabilitySlot[];
 }
