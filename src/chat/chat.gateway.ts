@@ -17,6 +17,8 @@ export class ChatGateway {
   @WebSocketServer()
   server: Server;
 
+  private userSockets = new Map<string, Socket>();
+
   constructor(private chatService: ChatService) {}
 
   handleConnection(socket: Socket) {
@@ -25,6 +27,23 @@ export class ChatGateway {
 
   handleDisconnect(socket: Socket) {
     console.log(`Client disconnected: ${socket.id}`);
+    // Remove socket mapping when user disconnects
+    for (const [userId, sock] of this.userSockets.entries()) {
+      if (sock.id === socket.id) {
+        this.userSockets.delete(userId);
+        console.log(`Removed socket mapping for user ${userId}`);
+        break;
+      }
+    }
+  }
+
+  @SubscribeMessage('register')
+  handleRegister(
+    @MessageBody() userId: string,
+    @ConnectedSocket() socket: Socket,
+  ) {
+    console.log(`Registering user ${userId} with socket ${socket.id}`);
+    this.userSockets.set(userId, socket);
   }
 
   @SubscribeMessage('send_message')
@@ -32,14 +51,27 @@ export class ChatGateway {
     @MessageBody() data: { senderId: number; receiverId: number; content: string },
     @ConnectedSocket() socket: Socket,
   ) {
+    console.log(`💬 Message from ${data.senderId} to ${data.receiverId}: ${data.content}`);
+    
     const message = await this.chatService.saveMessage(
       data.senderId,
       data.receiverId,
       data.content,
     );
 
-    // Emitir el mensaje al receptor
-    this.server.emit(`receive_message_${data.receiverId}`, message);
+    // Get receiver's socket
+    const receiverSocket = this.userSockets.get(data.receiverId.toString());
+    if (receiverSocket) {
+      console.log(`✉️ Sending message to socket ${receiverSocket.id}`);
+      receiverSocket.emit('receive_message', message);
+    } else {
+      console.log(`⚠️ Receiver ${data.receiverId} not connected`);
+      // Store message for later delivery if needed
+    }
+
+    // Also send back to sender for confirmation
+    socket.emit('receive_message', message);
+
     return message;
   }
 }
