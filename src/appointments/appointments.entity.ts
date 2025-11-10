@@ -1,14 +1,6 @@
-import { Patient } from '../users/entities/patient.entity';
-import { User } from '../users/entities/user.entity';
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+// appointments.entity.ts (fragmento relevante)
+import { Column, Entity, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+import { Patient } from '../patients/patient.old.entity';
 
 export enum AppointmentStatus {
   PENDING = 'PENDING',
@@ -17,41 +9,41 @@ export enum AppointmentStatus {
   COMPLETED = 'COMPLETED',
 }
 
-/**
- * Entidad Citas
- * Representa a las citas de los pacientes
- */
-@Entity('appointment')
-@Index('IDX_appointment_patient_start', ['patient', 'start'])
-@Index('IDX_appointment_doctor_start', ['doctorUser', 'start'])
+@Entity({ name: 'appointment' })
 export class Appointment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Patient, (patient) => patient.appointments, { eager: true })
-  @JoinColumn({ name: 'patient_id' })
-  patient: Patient;
+  // Mapea a column patient_id
+  @Column('uuid', { name: 'patient_id' })
+  patientId: string;
 
-  // Doctor = user con role 'doctor'
-  @ManyToOne(() => User, { eager: true })
-  @JoinColumn({ name: 'doctor_user_id' })
-  doctorUser: User;
+  // Mapea a column doctor_user_id
+  @Column('uuid', { name: 'doctor_user_id' })
+  doctorUserId: string;
 
-  @Column({ name: 'start_time', type: 'timestamp' })
-  start: Date;
+  // Mapea a column scheduledAt (timestamp without time zone)
+  @Column({ name: 'scheduledAt', type: 'timestamp without time zone' })
+  scheduledAt: Date;
 
-  @Column({ name: 'end_time', type: 'timestamp' })
-  end: Date;
-
-  @Column({ type: 'enum', enum: AppointmentStatus, default: AppointmentStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: AppointmentStatus,
+    default: AppointmentStatus.CONFIRMED,
+  })
   status: AppointmentStatus;
 
   @Column({ type: 'varchar', nullable: true })
   reason?: string;
 
-  @Column({ nullable: true, name: 'notes', type: 'text' })
-  description: string;
+  // <- Esto te faltaba en el entity (por eso TS decía que no existe)
+  @Column({ type: 'text', nullable: true })
+  note?: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'createdAt', type: 'timestamp without time zone', default: () => 'now()' })
   createdAt: Date;
+
+  // Relación ManyToOne hacia Patient (permite appointment.patient en otras entidades)
+  @ManyToOne(() => Patient, (p) => p.appointments, { nullable: true })
+  patient?: Patient;
 }

@@ -1,4 +1,4 @@
-import { IsDateString, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsUUID, IsISO8601, IsOptional, IsString, IsDateString, IsNotEmpty } from 'class-validator';
 
 export class CreateAppointmentDto {
   @IsUUID() doctorUserId: string;   // user.id del doctor

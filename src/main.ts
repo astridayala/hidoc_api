@@ -1,32 +1,36 @@
+// main.ts (Nest)
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 
-/**
- * Función principal para iniciar la aplicación
- * Configura middleware, Swagger y levanta el servidor
- */
 async function bootstrap() {
-  // Crea la aplicación NestJS
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  
-  // Habilita CORS para permitir solicitudes desde los sitios de clientes
-  app.enableCors();
-  
-  // Configura validación global de DTOs
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-  }));
-  
-  // Configura archivos estáticos para servir el script de tracking
+
+  app.enableCors({
+     origin: [
+    /http:\/\/localhost:\d+$/,            // permite PUERTOS aleatorios de Flutter web
+    'http://127.0.0.1:8080',
+    'http://localhost:8080',
+  ], 
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false, // Bearer en header
+    maxAge: 3600,
+  });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
   app.useStaticAssets(join(__dirname, '..', 'public'));
-  
-  // Configura Swagger
+
   const config = new DocumentBuilder()
     .setTitle('Clinica API')
     .setDescription('API HiDoc- aplicación para democratizar el acceso a servicios de salud.')
@@ -45,12 +49,16 @@ async function bootstrap() {
     .addTag('payments', 'Endpoints para pagos')
     .addTag('appointments', 'Endpoints para als citas')
     .build();
-  
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
-  
-  // Inicia el servidor
+
   const port = process.env.PORT || 3000;
+
+  // (Opcional) Si alguien probará desde otro dispositivo en la LAN:
+  // await app.listen(port, '0.0.0.0');
+  // console.log(`Servidor iniciado en: http://<IP-LAN>:${port}`);
+
   await app.listen(port);
   console.log(`Servidor iniciado en: http://localhost:${port}`);
   console.log(`Documentación Swagger: http://localhost:${port}/api/docs`);

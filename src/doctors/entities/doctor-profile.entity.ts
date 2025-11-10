@@ -1,5 +1,11 @@
-import { Column, CreateDateColumn, Entity, JoinTable, ManyToMany, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { User } from '../../users/entities/user.entity'; 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToMany,
+  JoinTable,
+  OneToMany,
+} from 'typeorm';
 import { DoctorCategory } from './doctor-category.entity';
 import { AvailabilitySlot } from './availability-slot.entity';
 
@@ -8,20 +14,27 @@ export class DoctorProfile {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => User, { eager: true })
-  user: User; // user.role === 'doctor'
+  // 👇 mapea a la columna real user_id
+  @Column('uuid', { name: 'user_id' })
+  userId: string;
 
-  @Column({ type: 'varchar' })  fullName: string;
-  @Column({ type: 'varchar' })  specialty: string;
-  @Column({ type: 'int', default: 0 }) price: number;
-  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 }) rating: number;
-  @Column({ type: 'text', nullable: true }) about?: string;
-  @Column({ type: 'boolean', default: false }) isOnline: boolean;
+  @Column({ name: 'fullName', type: 'varchar' })
+  fullName: string;
 
-  @CreateDateColumn({ type: 'timestamp' })
-  createdAt: Date;
+  @Column({ type: 'varchar' })
+  specialty: string;
 
-  @ManyToMany(() => DoctorCategory, { eager: true })
+  @Column({ type: 'integer', default: 0 })
+  price: number;
+
+  @Column({ type: 'numeric', precision: 3, scale: 2, default: 0 })
+  rating: number;
+
+  @Column({ name: 'isOnline', type: 'boolean', default: false })
+  isOnline: boolean;
+
+  // Relación con categorías (tabla puente doctor_category_on_doctor)
+  @ManyToMany(() => DoctorCategory, (c) => c.doctors, { eager: false })
   @JoinTable({
     name: 'doctor_category_on_doctor',
     joinColumn: { name: 'doctor_id', referencedColumnName: 'id' },
@@ -29,6 +42,6 @@ export class DoctorProfile {
   })
   categories: DoctorCategory[];
 
-  @OneToMany(() => AvailabilitySlot, s => s.doctor, { cascade: true })
+  @OneToMany(() => AvailabilitySlot, (s) => s.doctor, { eager: false })
   availability: AvailabilitySlot[];
 }

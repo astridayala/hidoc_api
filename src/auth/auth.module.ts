@@ -1,27 +1,44 @@
 import { Module } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
-import { UsersModule } from '../users/users.module';
-import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { PassportModule } from '@nestjs/passport';
+
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+
+// Si NO tienes UsersModule, deja UsersService aquí como en tu versión actual
+import { UsersService } from '../users/users.service';
 
 @Module({
   imports: [
-    UsersModule,
-    PassportModule,
+    ConfigModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET', 'astri'),
-        signOptions: { expiresIn: '24h' }
-      }),
-    })
+      useFactory: (cfg: ConfigService) => {
+        // Usa número (segundos). Si en .env pones "900" se parsea a 900.
+        const exp = Number(cfg.get('JWT_EXPIRES_IN') ?? 900); // 900 seg = 15 min
+        return {
+          secret: cfg.get<string>('JWT_SECRET') ?? 'dev-access-secret',
+          signOptions: { expiresIn: exp },
+        };
+      },
+    }),
   ],
-  providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    // Quita esta línea si importas UsersModule y lo exporta:
+    UsersService,
+  ],
+  exports: [
+    JwtModule,
+    PassportModule,
+    AuthService,
+  ],
 })
 export class AuthModule {}

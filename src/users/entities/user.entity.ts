@@ -3,10 +3,12 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Patient } from './patient.entity';
+import { CitaDoctor } from 'src/citas/citas.entity';
 
 export enum UserRole {
   Doctor   = 'doctor',
@@ -42,4 +44,7 @@ export class User {
 
   @OneToOne(() => Patient, (p) => p.user, { cascade: false, nullable: true })
   patient?: Patient;
+
+  @OneToMany(() => CitaDoctor, (cita) => cita.doctor)
+  doctorCitas: CitaDoctor[];
 }

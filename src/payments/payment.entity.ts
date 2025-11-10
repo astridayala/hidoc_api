@@ -1,25 +1,26 @@
-import { Procedure } from "../procedures/procedure.entity";
-import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+// src/payments/entities/payment.entity.ts
+import { Column, Entity, PrimaryGeneratedColumn, OneToOne, JoinColumn, RelationId } from 'typeorm';
+import { Procedure } from '../procedures/procedure.entity';
 
-/**
- * Entidad Payments
- * Representa el pago que se realiza para un procedimiento específico
- */
 @Entity('payment')
 export class Payment {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @OneToOne(() => Procedure, procedure => procedure.payment, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'procedure_id' })
-    procedure: Procedure;
+  // Relación con Procedure. La columna en BBDD es procedure_id
+  @OneToOne(() => Procedure, (procedure) => procedure.payment, { nullable: true })
+  @JoinColumn({ name: 'procedure_id' })
+  procedure?: Procedure | null;
 
-    @Column({ type: 'date' })
-    date: Date;
+  @RelationId((payment: Payment) => payment.procedure)
+  procedureId: string | null;
 
-    @Column('decimal', { precision: 10, scale: 2 })
-    amount: number;
+  @Column({ type: 'date' })
+  date: string; // YYYY-MM-DD
 
-    @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+  @Column({ type: 'numeric', precision: 10, scale: 2 })
+  amount: string;
+
+  @Column({ name: 'createdAt', type: 'timestamp', default: () => 'now()' })
+  createdAt: Date;
 }

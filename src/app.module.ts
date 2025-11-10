@@ -17,6 +17,8 @@ import { TreatmentStatusesModule } from './treatment_statuses/treatment_statuses
 import { AppointmentsModule } from './appointments/appointments.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { ChatModule } from './chat/chat.module';
+import { CitasModule } from './citas/citas.module';
+import { CheckoutModule } from './checkout/checkout.module';
 
 /**
  * Módulo principal de la aplicación
@@ -48,6 +50,8 @@ import { ChatModule } from './chat/chat.module';
     AppointmentsModule,
     DoctorsModule,
     ChatModule,
+    CitasModule,
+    CheckoutModule,
   ],
   controllers: [AppController],
   providers: [AppService],

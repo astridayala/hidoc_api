@@ -1,24 +1,78 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsNotEmpty, IsString, MinLength } from "class-validator";
+// auth/dto/register.dto.ts
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateIf,
+  Equals,
+  Matches,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 
-/**
- * DTO para registro de usuarios
- * Define y valida los datos necesarios para registrar un usuario
- */
+export enum UserRoleApi {
+  PATIENT = 'PATIENT',
+  DOCTOR  = 'DOCTOR',
+  ADMIN   = 'ADMIN',
+}
+
+const toBool = ({ value }: { value: any }) =>
+  value === true || value === 'true' || value === 1 || value === '1';
+
 export class RegisterDto {
-    @ApiProperty( { example: 'usuario@ejemplo.com', description: 'Email del usuario' })
-    @IsEmail({}, { message: 'Debe proporcionar un email válido'})
-    @IsNotEmpty( {message: 'El email es requerido'} )
-    email: string
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  fullName!: string;
 
-    @ApiProperty({ example: 'Juan Pérez', description: 'Nombre completo del usuario' })
-    @IsString({ message: 'El nombre debe ser una cadena de texto' })
-    @IsNotEmpty({ message: 'El nombre es requerido' })
-    name: string;
+  @ApiProperty()
+  @IsEmail()
+  email!: string;
 
-    @ApiProperty({ example: 'Contraseña123', description: 'Contraseña del usuario' })
-    @IsString({ message: 'La contraseña debe ser una cadena de texto' })
-    @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
-    @IsNotEmpty({ message: 'La contraseña es requerida' })
-    password: string;
+  @ApiProperty()
+  @IsString()
+  @MinLength(6)
+  password!: string;
+
+  // Permitimos DOCTOR, PATIENT, PACIENTE y ADMIN (tu backend mapea PACIENTE→paciente)
+  @ApiProperty({ enum: ['DOCTOR', 'PATIENT', 'PACIENTE', 'ADMIN'] })
+  @IsString()
+  @Matches(/^(DOCTOR|PATIENT|PACIENTE|ADMIN)$/i, {
+    message: 'role debe ser DOCTOR, PATIENT, PACIENTE o ADMIN',
+  })
+  role!: string;
+
+  // Debe venir en true
+  @ApiProperty({ description: 'Debe venir en true si aceptó T&C' })
+  @Transform(toBool)
+  @IsBoolean()
+  @Equals(true, { message: 'Debe aceptar los términos y condiciones' })
+  acceptTerms!: boolean;
+
+  // ===== Campos solo para DOCTOR =====
+  @ApiProperty({ required: false })
+  @ValidateIf(o => String(o.role).toUpperCase() === 'DOCTOR')
+  @IsString()
+  professionalId?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Checkbox: “Afirmo que mi identificación profesional está aprobada por la Junta…”.',
+  })
+  @ValidateIf(o => String(o.role).toUpperCase() === 'DOCTOR')
+  @Transform(toBool)
+  @IsBoolean()
+  // Si quisieras forzar que sea true, descomenta:
+  // @Equals(true, { message: 'Debe afirmar la aprobación de la Junta' })
+  boardApproved?: boolean;
+
+  // ===== Opcional para ambos roles =====
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  specialty?: string;
 }

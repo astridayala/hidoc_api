@@ -144,7 +144,7 @@ class PaginatedDoctorsResponseDto {
   AvailabilityDayDto,
   PaginatedDoctorsResponseDto,
 )
-@Controller('v1/doctors')
+@Controller('doctors')
 export class DoctorsController {
   constructor(private readonly doctors: DoctorsService) {}
 

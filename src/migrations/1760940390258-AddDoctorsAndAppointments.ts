@@ -53,10 +53,6 @@ export class AddDoctorsAndAppointments1760940390258 implements MigrationInterfac
     `);
     await queryRunner.query(`CREATE INDEX "IDX_slot_doctor_start" ON "availability_slot" ("doctor_id","start");`);
 
-    // 5) Citas (appointment)
-    await queryRunner.query(`
-      CREATE TYPE "appointment_status_enum" AS ENUM ('PENDING','CONFIRMED','CANCELLED','COMPLETED');
-    `);
     await queryRunner.query(`
       CREATE TABLE "appointment" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -88,7 +84,6 @@ export class AddDoctorsAndAppointments1760940390258 implements MigrationInterfac
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_appointment_doctor";`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_appointment_patient";`);
     await queryRunner.query(`DROP TABLE "appointment";`);
-    await queryRunner.query(`DROP TYPE "appointment_status_enum";`);
 
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_slot_doctor_start";`);
     await queryRunner.query(`DROP TABLE "availability_slot";`);
