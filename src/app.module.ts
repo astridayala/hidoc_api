@@ -18,6 +18,7 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { CitasModule } from './citas/citas.module';
 import { CheckoutModule } from './checkout/checkout.module';
+import { ChatModule } from './chat/chat.module';
 
 /**
  * Módulo principal de la aplicación
@@ -50,6 +51,7 @@ import { CheckoutModule } from './checkout/checkout.module';
     DoctorsModule,
     CitasModule,
     CheckoutModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
