@@ -12,17 +12,17 @@ import * as bcrypt from 'bcrypt';
 type DbRole = 'doctor' | 'paciente' | 'admin';
 
 export interface CreateUserInput {
-  name: string;                 // full name recibido desde el front
+  name: string;
   email: string;
-  password: string;             // plano o ya hasheado (se detecta)
-  role: DbRole | string;        // 'doctor' | 'paciente' | 'admin' o variantes API
+  password: string;
+  role: DbRole | string;
   professionalId?: string | null;
-  specialty?: string;           // opcional (para doctor_profile)
+  specialty?: string;
 }
 
-/* -------------------------------
+/* ---------------------------------
  * Helpers
- * -----------------------------*/
+ * --------------------------------*/
 
 /** Normaliza el rol que venga del API a tu enum de BD */
 function normalizeDbRole(input?: string | null): DbRole {
@@ -42,6 +42,7 @@ function splitFullName(fullName: string): { first: string; last: string } {
   if (parts.length === 1) {
     return { first: parts[0], last: '-' }; // placeholder no nulo
   }
+
   const last = parts.pop() as string;
   const first = parts.join(' ');
   return {
@@ -54,15 +55,14 @@ function splitFullName(fullName: string): { first: string; last: string } {
 export class UsersService {
   constructor(private readonly ds: DataSource) {}
 
-  // =========================
-  // Métodos requeridos por Auth
-  // =========================
+  // ======================================================
+  // MÉTODOS REQUERIDOS POR AUTH
+  // ======================================================
 
   /** Busca usuario por email (incluye password para validar login) */
   async findByEmail(email: string) {
     const rows = await this.ds.query(
-      `SELECT id, email, name, role, password, "createdAt"
-         FROM "user" WHERE email = $1 LIMIT 1`,
+      `SELECT id, email, name, role, password, "createdAt" FROM "user" WHERE email = $1 LIMIT 1`,
       [email],
     );
     return rows[0] || null;
@@ -70,8 +70,7 @@ export class UsersService {
 
   async findOne(id: string) {
     const rows = await this.ds.query(
-      `SELECT id, email, name, role, "createdAt"
-         FROM "user" WHERE id = $1 LIMIT 1`,
+      `SELECT id, email, name, role, "createdAt" FROM "user" WHERE id = $1 LIMIT 1`,
       [id],
     );
     return rows[0] || null;
@@ -82,33 +81,25 @@ export class UsersService {
    * Acepta 'name' como full name y deriva 'lastName' para cumplir NOT NULL.
    */
   async create(data: Partial<CreateUserInput>) {
-    // Validaciones mínimas
     if (!data?.email || !data?.password || !data?.name) {
       throw new BadRequestException('Faltan campos para crear usuario');
     }
 
-    // ¿ya existe el email?
     const existing = await this.findByEmail(data.email);
     if (existing) {
       throw new ConflictException('El email ya está registrado');
     }
 
-    // Hash de contraseña (si no viene ya hasheada)
     const isBcrypt =
       typeof data.password === 'string' && data.password.startsWith('$2b$');
     const passwordHash = isBcrypt
       ? String(data.password)
       : await bcrypt.hash(String(data.password), 12);
 
-    // Normaliza el rol a enum de BD
     const role: DbRole = normalizeDbRole(String(data.role ?? ''));
-
-    // Deriva nombres para patient (por si hay NOT NULL en lastName)
     const { first, last } = splitFullName(String(data.name));
 
-    // Transacción: crea usuario y su perfil por rol
     return await this.ds.transaction(async (trx) => {
-      // 1) Insert en tabla "user"
       const userRes = await trx.query(
         `INSERT INTO "user"(email, name, role, password)
          VALUES ($1, $2, $3::user_role_enum, $4)
@@ -117,9 +108,7 @@ export class UsersService {
       );
       const user = userRes[0];
 
-      // 2) Según rol, crea registro en patient o doctor_profile
       if (role === 'paciente') {
-        // Inserta con lastName derivado para cumplir NOT NULL
         await trx.query(
           `INSERT INTO "patient"("userId", name, "lastName", email)
            VALUES ($1, $2, $3, $4)`,
@@ -127,38 +116,96 @@ export class UsersService {
         );
       } else if (role === 'doctor') {
         const professionalId = data.professionalId ?? null;
-
-        // Defaults seguros si no llegan en el registro
         const specialty = (data as any).specialty ?? 'General';
-        const price = 0;           // integer
-        const rating = 0;          // numeric(3,2)
-        const about = null;        // text
-        const isOnline = false;    // boolean
+        const price = 0;
+        const rating = 0;
+        const about = null;
+        const isOnline = false;
 
         await trx.query(
-          `INSERT INTO "doctor_profile"
-            ("user_id", "fullName", "specialty", "price", "rating", "about", "isOnline", "professionalId")
-           VALUES ($1,       $2,        $3,         $4,     $5,       $6,      $7,         $8)`,
+          `INSERT INTO "doctor_profile" (
+             "user_id", "fullName", "specialty", "price", "rating",
+             "about", "isOnline", "professionalId"
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [user.id, user.name, specialty, price, rating, about, isOnline, professionalId],
         );
       }
-      // (role === 'admin') -> sin perfil adicional por ahora
 
-      return user; // devuelve el usuario (sin password)
+      return user;
     });
   }
 
-  // =========================
+  // ======================================================
   // PERFIL (me)
-  // =========================
+  // ======================================================
 
   async getMe(userId: string) {
-    const user = await this.ds.query(
-      `SELECT id, email, name, role, "createdAt" FROM "user" WHERE id = $1 LIMIT 1`,
+    const userRes = await this.ds.query(
+      `SELECT id, email, name, role FROM "user" WHERE id = $1 LIMIT 1`,
       [userId],
     );
-    if (!user[0]) throw new NotFoundException('Usuario no encontrado');
-    return user[0];
+    const user = userRes[0];
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (user.role !== 'doctor') return user;
+
+    const profileRes = await this.ds.query(
+      `SELECT "specialty", "about", "professionalId", "rating"
+       FROM "doctor_profile" WHERE "user_id" = $1 LIMIT 1`,
+      [userId],
+    );
+    const profile = profileRes[0] ?? {};
+
+    let total_patients = 0;
+    try {
+      const statsRes = await this.ds.query(
+        `SELECT COUNT(*) as "count"
+         FROM "cita_doctor"
+         WHERE "doctor_id" = $1 AND status = 'completada'`,
+        [userId],
+      );
+      total_patients = parseInt(statsRes[0]?.count || '0', 10);
+    } catch {
+      console.warn('Advertencia: No se pudo calcular total_patients.');
+    }
+
+    let citas_hoy = 0;
+    try {
+      const citasRes = await this.ds.query(
+        `SELECT COUNT(*) as "count"
+         FROM "cita_doctor"
+         WHERE "doctor_id" = $1 AND "fecha_cita"::date = CURRENT_DATE`,
+        [userId],
+      );
+      citas_hoy = parseInt(citasRes[0]?.count || '0', 10);
+    } catch {
+      console.warn('Advertencia: No se pudo calcular citas_hoy.');
+    }
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      specialty: profile.specialty ?? 'Especialidad no definida',
+      biography: profile.about ?? 'Sin biografía.',
+      license: profile.professionalId ?? 'N/A',
+      rating: parseFloat(profile.rating || '0'),
+      phone: 'N/A (Agregar a BD)',
+      location: 'N/A (Agregar a BD)',
+      years_experience: 0,
+      schedule: {
+        lunes: '09:00 - 17:00',
+        martes: '09:00 - 17:00',
+        miercoles: '09:00 - 13:00',
+      },
+      diplomas: [
+        { title: 'Medicina General', institution: 'Universidad X', year: '2010' },
+      ],
+      reviews: [],
+      ingresos: [3000, 3200, 2800, 3500],
+      total_patients,
+      citas_hoy,
+    };
   }
 
   async updateMe(userId: string, dto: { name?: string; email?: string }) {
@@ -174,8 +221,8 @@ export class UsersService {
       sets.push(`name = $${i++}`);
       params.push(dto.name);
     }
+
     if (dto.email) {
-      // valida colisión de email
       const exists = await this.findByEmail(dto.email);
       if (exists && exists.id !== userId) {
         throw new ConflictException('El email ya está en uso');
@@ -185,14 +232,15 @@ export class UsersService {
     }
 
     params.push(userId);
-    const sql = `UPDATE "user" SET ${sets.join(', ')} WHERE id = $${i} RETURNING id, email, name, role, "createdAt"`;
+    const sql = `UPDATE "user" SET ${sets.join(', ')} WHERE id = $${i}
+                 RETURNING id, email, name, role, "createdAt"`;
     const updated = await this.ds.query(sql, params);
     return updated[0];
   }
 
-  // =========================
+  // ======================================================
   // HISTORIAL (me/history)
-  // =========================
+  // ======================================================
 
   private async findPatientForUserOrNull(user: any) {
     const byUser = await this.ds.query(
@@ -241,54 +289,40 @@ export class UsersService {
 
     const [conditions, treatments, procedures, payments] = await Promise.all([
       this.ds.query(
-        `SELECT mrc.id,
-                c.id as "conditionId",
-                c.name
-           FROM "medical_record_condition" mrc
-           JOIN "condition" c ON c.id = mrc."condition_id"
-          WHERE mrc."medical_record_id" = $1
-          ORDER BY c.name ASC`,
+        `SELECT mrc.id, c.id as "conditionId", c.name
+         FROM "medical_record_condition" mrc
+         JOIN "condition" c ON c.id = mrc."condition_id"
+         WHERE mrc."medical_record_id" = $1
+         ORDER BY c.name ASC`,
         [medicalRecordId],
       ),
 
       this.ds.query(
-        `SELECT t.id,
-                t."totalPrice",
-                t."startDate",
-                ts.name as status,
-                tt.name as type
-           FROM "treatment" t
-           JOIN "treatment_status" ts ON ts.id = t."status_id"
-           JOIN "treatment_type"   tt ON tt.id = t."treatment_type_id"
-          WHERE t."medical_record_id" = $1
-          ORDER BY t."createdAt" DESC`,
+        `SELECT t.id, t."totalPrice", t."startDate", ts.name as status, tt.name as type
+         FROM "treatment" t
+         JOIN "treatment_status" ts ON ts.id = t."status_id"
+         JOIN "treatment_type" tt ON tt.id = t."treatment_type_id"
+         WHERE t."medical_record_id" = $1
+         ORDER BY t."createdAt" DESC`,
         [medicalRecordId],
       ),
 
       this.ds.query(
-        `SELECT p.id,
-                p."treatment_id" as "treatmentId",
-                p."date",
-                p.description,
-                p."createdAt"
-           FROM "procedure" p
-           JOIN "treatment" t ON t.id = p."treatment_id"
-          WHERE t."medical_record_id" = $1
-          ORDER BY p."date" DESC, p."createdAt" DESC`,
+        `SELECT p.id, p."treatment_id" as "treatmentId", p."date", p.description, p."createdAt"
+         FROM "procedure" p
+         JOIN "treatment" t ON t.id = p."treatment_id"
+         WHERE t."medical_record_id" = $1
+         ORDER BY p."date" DESC, p."createdAt" DESC`,
         [medicalRecordId],
       ),
 
       this.ds.query(
-        `SELECT pay.id,
-                pay."procedure_id" as "procedureId",
-                pay."date",
-                pay.amount,
-                pay."createdAt"
-           FROM "payment" pay
-           JOIN "procedure" p ON p.id = pay."procedure_id"
-           JOIN "treatment" t ON t.id = p."treatment_id"
-          WHERE t."medical_record_id" = $1
-          ORDER BY pay."date" DESC, pay."createdAt" DESC`,
+        `SELECT pay.id, pay."procedure_id" as "procedureId", pay."date", pay.amount, pay."createdAt"
+         FROM "payment" pay
+         JOIN "procedure" p ON p.id = pay."procedure_id"
+         JOIN "treatment" t ON t.id = p."treatment_id"
+         WHERE t."medical_record_id" = $1
+         ORDER BY pay."date" DESC, pay."createdAt" DESC`,
         [medicalRecordId],
       ),
     ]);
@@ -300,7 +334,9 @@ export class UsersService {
     if (dto.type !== 'condition') {
       throw new BadRequestException('Por ahora solo se admite type="condition"');
     }
-    if (!dto.name?.trim()) throw new BadRequestException('name es requerido');
+    if (!dto.name?.trim()) {
+      throw new BadRequestException('name es requerido');
+    }
 
     const patient = await this.findPatientForUserOrNull(user);
     if (!patient) throw new NotFoundException('Paciente no encontrado para este usuario');
@@ -317,17 +353,15 @@ export class UsersService {
       conditionId = existing[0].id;
     } else {
       const created = await this.ds.query(
-        `INSERT INTO "condition"(name)
-         VALUES ($1)
-         RETURNING id`,
+        `INSERT INTO "condition"(name) VALUES ($1) RETURNING id`,
         [dto.name.trim()],
       );
       conditionId = created[0].id;
     }
 
     const link = await this.ds.query(
-      `INSERT INTO "medical_record_condition"("medical_record_id","condition_id")
-       VALUES ($1,$2)
+      `INSERT INTO "medical_record_condition"("medical_record_id", "condition_id")
+       VALUES ($1, $2)
        RETURNING id, "medical_record_id" as "medicalRecordId", "condition_id" as "conditionId"`,
       [medicalRecordId, conditionId],
     );
@@ -342,17 +376,18 @@ export class UsersService {
     const medicalRecordId = await this.ensureMedicalRecordId(patient);
 
     const row = await this.ds.query(
-      `SELECT id
-         FROM "medical_record_condition"
-        WHERE id = $1
-          AND "medical_record_id" = $2
-        LIMIT 1`,
+      `SELECT id FROM "medical_record_condition"
+       WHERE id = $1 AND "medical_record_id" = $2 LIMIT 1`,
       [id, medicalRecordId],
     );
 
     if (!row[0]) throw new ForbiddenException('No puedes borrar esta entrada');
 
-    await this.ds.query(`DELETE FROM "medical_record_condition" WHERE id = $1`, [id]);
+    await this.ds.query(
+      `DELETE FROM "medical_record_condition" WHERE id = $1`,
+      [id],
+    );
+
     return;
   }
 }
