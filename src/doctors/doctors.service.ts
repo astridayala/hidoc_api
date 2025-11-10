@@ -45,9 +45,9 @@ export class DoctorsService {
       qb.andWhere('(d.fullName ILIKE :q OR d.specialty ILIKE :q)', { q: `%${query.q}%` });
     }
 
-    if (query.sort === 'rating') qb.orderBy('d.rating', 'DESC');
-    else if (query.sort === 'price') qb.orderBy('d.price', 'ASC');
-    else qb.orderBy('d.createdAt', 'DESC');
+  if (query.sort === 'rating') qb.orderBy('d.rating', 'DESC');
+  else if (query.sort === 'price') qb.orderBy('d.price', 'ASC');
+  else qb.orderBy('d.fullName', 'ASC');
 
     qb.skip(skip).take(limit);
 
