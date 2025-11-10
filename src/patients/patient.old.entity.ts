@@ -39,6 +39,6 @@ export class Patient {
     @OneToOne(() => MedicalRecord, record => record.patient, { cascade:true })
     medicalRecord: MedicalRecord;
     
-    @OneToMany(() => Appointment, appointment => appointment.patientId)
-    appointments: Appointment[];
+    @OneToMany(() => Appointment, (a) => a.patientId)
+    appointments?: Appointment[];
 }
